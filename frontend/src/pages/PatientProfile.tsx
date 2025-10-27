@@ -100,13 +100,13 @@ function PatientProfile() {
 				</Card>
 				<Card className="p-4">
 					<p className="text-sm text-muted-foreground">Adherence</p>
-					<p className="text-2xl font-bold text-primary">
+					<p className="text-2xl font-bold text-foreground">
 						{patientData.adherence}%
 					</p>
 				</Card>
 				<Card className="p-4">
 					<p className="text-sm text-muted-foreground">Surgeon</p>
-					<p className="text-sm font-semibold text-foreground">
+					<p className="text-lg font-semibold text-foreground">
 						{patientData.surgeon}
 					</p>
 				</Card>

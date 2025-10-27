@@ -1,7 +1,8 @@
 import { Card } from "@/components/ui/card";
+import { SquareCheckBig } from "lucide-react";
 import { useState } from "react";
 
-function PatientEducation() {
+function PatientResources() {
 	const [selectedCategory, setSelectedCategory] = useState<string | null>(
 		null
 	);
@@ -106,8 +107,8 @@ function PatientEducation() {
 										{article.title}
 									</p>
 									{article.read && (
-										<span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-											Read
+										<span className="text-xs bg-green-600/20 text-green-700 font-medium p-1 rounded">
+											<SquareCheckBig className="w-4 h-4" />
 										</span>
 									)}
 								</div>
@@ -136,4 +137,4 @@ function PatientEducation() {
 	);
 }
 
-export default PatientEducation;
+export default PatientResources;

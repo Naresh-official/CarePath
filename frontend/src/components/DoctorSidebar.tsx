@@ -59,16 +59,9 @@ function DoctorSidebar({
 								}`
 							}
 						>
-							{route === "alerts" ? (
-								<span className="flex items-center justify-between">
-									{formatLabel(route)}
-									<span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-										3
-									</span>
-								</span>
-							) : (
-								formatLabel(route)
-							)}
+							<span className="flex items-center justify-between">
+								{formatLabel(route)}
+							</span>
 						</NavLink>
 					))}
 				</nav>

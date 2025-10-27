@@ -3,27 +3,51 @@ import { Card } from "@/components/ui/card";
 import { useState } from "react";
 
 function PatientCheckIn() {
-	const [formData, setFormData] = useState({
-		pain: 5,
-		temperature: 98.6,
+	const [formData, setFormData] = useState<{
+		pain: number;
+		temperature: number;
+		bp: string;
+		mood: string;
+		notes: string;
+		image: File | null;
+	}>({
+		pain: 0,
+		temperature: 36.5,
+		bp: "120/80",
 		mood: "good",
 		notes: "",
+		image: null,
 	});
 	const [submitted, setSubmitted] = useState(false);
-	const [checkInHistory, setCheckInHistory] = useState([
+	const [imagePreview, setImagePreview] = useState<string | null>(null);
+	const [checkInHistory, setCheckInHistory] = useState<
+		{
+			date: string;
+			pain: number;
+			temperature: number;
+			bp: string;
+			mood: string;
+			notes: string;
+			image: File | null;
+		}[]
+	>([
 		{
 			date: "Today at 2:30 PM",
 			pain: 4,
 			temperature: 98.6,
+			bp: "118/78",
 			mood: "good",
 			notes: "Feeling better after rest",
+			image: null,
 		},
 		{
 			date: "Yesterday at 8:00 AM",
 			pain: 6,
 			temperature: 99.1,
+			bp: "125/82",
 			mood: "okay",
 			notes: "Some discomfort in the morning",
+			image: null,
 		},
 	]);
 
@@ -32,6 +56,7 @@ function PatientCheckIn() {
 			{
 				date: new Date().toLocaleString(),
 				...formData,
+				image: formData.image || null,
 			},
 			...checkInHistory,
 		]);
@@ -55,6 +80,29 @@ function PatientCheckIn() {
 			});
 		}
 		return alerts;
+	};
+
+	const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		setFormData({
+			...formData,
+			image: file || null,
+		});
+
+		if (file) {
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				setImagePreview(reader.result as string);
+			};
+			reader.readAsDataURL(file);
+		} else {
+			setImagePreview(null);
+		}
+	};
+
+	const clearImage = () => {
+		setFormData({ ...formData, image: null });
+		setImagePreview(null);
 	};
 
 	const alerts = getSymptomAlerts();
@@ -105,7 +153,13 @@ function PatientCheckIn() {
 								pain: Number.parseInt(e.target.value),
 							})
 						}
-						className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+						className={`w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer ${
+							formData.pain <= 3
+								? "accent-green-500"
+								: formData.pain <= 7
+								? "accent-yellow-500"
+								: "accent-red-500"
+						}`}
 					/>
 					<div className="flex justify-between text-xs text-muted-foreground">
 						<span>No Pain</span>
@@ -114,9 +168,10 @@ function PatientCheckIn() {
 				</div>
 
 				{/* Temperature */}
+				{/* TODO : Set upper and lower limit */}
 				<div className="space-y-2">
 					<label className="font-semibold text-foreground">
-						Temperature
+						Temperature (°C)
 					</label>
 					<input
 						type="number"
@@ -129,7 +184,26 @@ function PatientCheckIn() {
 							})
 						}
 						className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground"
-						placeholder="98.6°F"
+						placeholder="36.5"
+					/>
+				</div>
+
+				{/* Blood Pressure */}
+				<div className="space-y-2">
+					<label className="font-semibold text-foreground">
+						Blood Pressure (mmHg)
+					</label>
+					<input
+						type="text"
+						value={formData.bp}
+						onChange={(e) =>
+							setFormData({
+								...formData,
+								bp: e.target.value,
+							})
+						}
+						className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground"
+						placeholder="120/80"
 					/>
 				</div>
 
@@ -155,6 +229,55 @@ function PatientCheckIn() {
 							</button>
 						))}
 					</div>
+				</div>
+
+				{/* Image Upload */}
+				<div className="space-y-2">
+					<label className="font-semibold text-foreground">
+						Upload Image
+					</label>
+					{imagePreview ? (
+						<div className="space-y-2">
+							<img
+								src={imagePreview}
+								alt="Preview"
+								className="w-full h-64 object-cover rounded-lg border border-border"
+							/>
+							<div className="flex gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									onClick={clearImage}
+									className="flex-1"
+								>
+									Remove Image
+								</Button>
+								<label className="flex-1">
+									<input
+										type="file"
+										accept=".jpeg,.jpg,.png,.heic,image/jpeg,image/png,image/heic"
+										onChange={handleImageChange}
+										className="hidden"
+									/>
+									<Button
+										type="button"
+										variant="outline"
+										className="w-full cursor-pointer"
+										asChild
+									>
+										<span>Change Image</span>
+									</Button>
+								</label>
+							</div>
+						</div>
+					) : (
+						<input
+							type="file"
+							accept=".jpeg,.jpg,.png,.heic,image/jpeg,image/png,image/heic"
+							onChange={handleImageChange}
+							className="w-full p-3 border border-border rounded-lg bg-input text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+						/>
+					)}
 				</div>
 
 				{/* Notes */}
@@ -210,14 +333,28 @@ function PatientCheckIn() {
 									</p>
 								</div>
 								<div>
-									<p className="text-muted-foreground">
-										Mood
-									</p>
-									<p className="font-semibold text-foreground capitalize">
-										{checkin.mood}
+									<p className="text-muted-foreground">BP</p>
+									<p className="font-semibold text-foreground">
+										{checkin.bp}
 									</p>
 								</div>
 							</div>
+							<div className="text-sm">
+								<p className="text-muted-foreground">Mood</p>
+								<p className="font-semibold text-foreground capitalize">
+									{checkin.mood}
+								</p>
+							</div>
+							{checkin.image && (
+								<div className="text-sm">
+									<p className="text-muted-foreground">
+										Image
+									</p>
+									<p className="font-semibold text-foreground">
+										{checkin.image?.name}
+									</p>
+								</div>
+							)}
 							{checkin.notes && (
 								<p className="text-sm text-muted-foreground italic">
 									"{checkin.notes}"

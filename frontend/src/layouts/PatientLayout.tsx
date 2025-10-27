@@ -1,4 +1,3 @@
-import Footer from "@/components/Footer";
 import PatientHeader from "@/components/PatientHeader";
 import { Outlet } from "react-router";
 
@@ -7,7 +6,6 @@ function PatientLayout() {
 		<div>
 			<PatientHeader />
 			<Outlet />
-			<Footer />
 		</div>
 	);
 }

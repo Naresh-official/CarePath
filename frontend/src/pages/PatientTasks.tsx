@@ -50,6 +50,7 @@ function PatientTasks() {
 				))}
 			</div>
 
+			{/* TODO : sent sms / email reminder */}
 			<div className="flex-1 h-full overflow-y-auto space-y-8 pr-4">
 				<div className="space-y-3 mt-8">
 					<h2 className="font-semibold text-3xl text-foreground">
@@ -59,6 +60,7 @@ function PatientTasks() {
 						Your current prescriptions and schedules
 					</p>
 					<Card className="p-4 space-y-3">
+						{/* Remove Item once taken */}
 						<MedicationItem
 							name="Ibuprofen 400mg"
 							schedule="Every 6 hours"
@@ -134,7 +136,7 @@ function MedicationItem({
 				</p>
 			</div>
 			<Button size="sm" variant="outline">
-				Take
+				Taken
 			</Button>
 		</div>
 	);
@@ -157,9 +159,6 @@ function ExerciseDemo({ title, duration, difficulty }: ExerciseDemoProps) {
 					</p>
 				</div>
 				<Button size="sm">View Demo</Button>
-			</div>
-			<div className="bg-muted rounded-lg h-32 flex items-center justify-center text-muted-foreground">
-				[Video/GIF Demonstration]
 			</div>
 		</Card>
 	);

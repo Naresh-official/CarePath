@@ -12,7 +12,7 @@ function Hero() {
 							Guide Patients, Monitor Recovery, Automate Care
 						</h1>
 						<p className="mt-6 text-lg text-gray-600 max-w-lg">
-							CarePaath integrates with your EHR to guide patients
+							CarePath integrates with your EHR to guide patients
 							from pre-op to recovery, empowers clinicians with
 							real-time data, and gives administrators the tools
 							to scale.
@@ -37,7 +37,7 @@ function Hero() {
 					<div className="relative z-0">
 						<img
 							src="https://placehold.co/600x500/e0f2fe/0284c7?text=Patient+App+on+Phone+%26%0AClinician+Dashboard+on+Desktop"
-							alt="CarePaath app on phone and desktop"
+							alt="CarePath app on phone and desktop"
 							className="rounded-2xl shadow-2xl object-cover"
 							onError={(e) => {
 								e.target.onerror = null;

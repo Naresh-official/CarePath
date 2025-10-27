@@ -59,7 +59,7 @@ function PatientHome() {
 				<Button
 					size="lg"
 					className="h-24 flex flex-col items-center justify-center gap-2 text-base"
-					onClick={() => navigate("/checkin")}
+					onClick={() => navigate("/patient/checkin")}
 				>
 					<span className="text-2xl">📋</span>
 					Symptom Check-in

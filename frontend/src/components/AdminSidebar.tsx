@@ -37,7 +37,7 @@ function AdminSidebar({
 			>
 				<div>
 					<h1 className="text-2xl font-bold text-sidebar-primary">
-						SeamlessMD
+						CarePath
 					</h1>
 					<p className="text-xs text-sidebar-foreground/60">
 						Administration Portal

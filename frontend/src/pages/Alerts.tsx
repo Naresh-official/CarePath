@@ -6,9 +6,6 @@ import { Card } from "@/components/ui/card";
 
 function Alerts() {
 	const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
-	const [filterStatus, setFilterStatus] = useState<"active" | "resolved">(
-		"active"
-	);
 
 	const allAlerts = [
 		{
@@ -44,7 +41,7 @@ function Alerts() {
 		{
 			id: 4,
 			patient: "James Wilson",
-			severity: "info",
+			severity: "normal",
 			type: "Check-in Completed",
 			message: "Patient completed daily symptom check-in",
 			time: "2 hours ago",
@@ -53,7 +50,7 @@ function Alerts() {
 		},
 	];
 
-	let filteredAlerts = allAlerts.filter((a) => a.status === filterStatus);
+	let filteredAlerts = allAlerts;
 	if (filterSeverity) {
 		filteredAlerts = filteredAlerts.filter(
 			(a) => a.severity === filterSeverity
@@ -67,15 +64,10 @@ function Alerts() {
 		warning: allAlerts.filter(
 			(a) => a.severity === "warning" && a.status === "active"
 		).length,
-		info: allAlerts.filter(
-			(a) => a.severity === "info" && a.status === "active"
+		normal: allAlerts.filter(
+			(a) => a.severity === "normal" && a.status === "active"
 		).length,
 	};
-
-	const statusFilters = [
-		{ value: "active" as const, label: "Active" },
-		{ value: "resolved" as const, label: "Resolved" },
-	];
 
 	const severityFilters = [
 		{ value: null, label: "All Severity", variant: "default" as const },
@@ -91,10 +83,10 @@ function Alerts() {
 			color: "yellow",
 		},
 		{
-			value: "info",
-			label: "Info",
+			value: "normal",
+			label: "Normal",
 			variant: "default" as const,
-			color: "blue",
+			color: "green",
 		},
 	];
 
@@ -124,10 +116,10 @@ function Alerts() {
 						{stats.warning}
 					</p>
 				</Card>
-				<Card className="p-4 border-l-4 border-l-blue-500">
-					<p className="text-sm text-muted-foreground">Info</p>
-					<p className="text-3xl font-bold text-blue-600">
-						{stats.info}
+				<Card className="p-4 border-l-4 border-l-green-500">
+					<p className="text-sm text-muted-foreground">Normal</p>
+					<p className="text-3xl font-bold text-green-600">
+						{stats.normal}
 					</p>
 				</Card>
 			</div>
@@ -135,22 +127,6 @@ function Alerts() {
 			{/* Filters */}
 			<Card className="p-4 space-y-4">
 				<div className="flex flex-col md:flex-row gap-4">
-					<div className="flex gap-2 flex-wrap">
-						{statusFilters.map((filter) => (
-							<Button
-								key={filter.value}
-								variant={
-									filterStatus === filter.value
-										? "default"
-										: "outline"
-								}
-								size="sm"
-								onClick={() => setFilterStatus(filter.value)}
-							>
-								{filter.label}
-							</Button>
-						))}
-					</div>
 					<div className="flex gap-2 flex-wrap">
 						{severityFilters.map((filter) => (
 							<Button
@@ -167,12 +143,12 @@ function Alerts() {
 									filter.color === "yellow"
 										? "bg-yellow-500 hover:bg-yellow-600 text-white"
 										: filterSeverity === filter.value &&
-										  filter.color === "blue"
-										? "bg-blue-500 hover:bg-blue-600 text-white"
+										  filter.color === "green"
+										? "bg-green-500 hover:bg-green-600 text-white"
 										: filter.color === "yellow"
 										? "hover:bg-yellow-50"
-										: filter.color === "blue"
-										? "hover:bg-blue-50"
+										: filter.color === "green"
+										? "hover:bg-green-50"
 										: ""
 								}
 							>
@@ -189,12 +165,13 @@ function Alerts() {
 					filteredAlerts.map((alert) => (
 						<Card
 							key={alert.id}
+							// TODO : Remove alerts filters if resolved is selected
 							className={`p-4 border-l-4 ${
 								alert.severity === "critical"
 									? "border-l-red-500 bg-red-50"
 									: alert.severity === "warning"
 									? "border-l-yellow-500 bg-yellow-50"
-									: "border-l-blue-500 bg-blue-50"
+									: "border-l-green-500 bg-green-50"
 							}`}
 						>
 							<div className="space-y-3">
@@ -212,7 +189,7 @@ function Alerts() {
 														: alert.severity ===
 														  "warning"
 														? "bg-yellow-200 text-yellow-800"
-														: "bg-blue-200 text-blue-800"
+														: "bg-green-200 text-green-800"
 												}`}
 											>
 												{alert.type}

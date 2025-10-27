@@ -88,7 +88,7 @@ function DoctorDashboard() {
 
 	filteredPatients.sort((a, b) => {
 		if (sortBy === "name") return a.name.localeCompare(b.name);
-		if (sortBy === "day") return b.day - a.day;
+		if (sortBy === "day") return a.day - b.day;
 		const riskOrder = { critical: 0, monitor: 1, stable: 2 };
 		return (
 			riskOrder[a.risk as keyof typeof riskOrder] -
@@ -229,7 +229,7 @@ function DoctorDashboard() {
 						<SelectContent>
 							<SelectItem value="risk">Risk Level</SelectItem>
 							<SelectItem value="name">Patient Name</SelectItem>
-							<SelectItem value="day">Days Post-Op</SelectItem>
+							<SelectItem value="day">Recent</SelectItem>
 						</SelectContent>
 					</Select>
 				</div>

@@ -11,7 +11,7 @@ import DoctorLayout from "./layouts/DoctorLayout.tsx";
 import PatientHome from "./pages/PatientHome.tsx";
 import PatientTasks from "./pages/PatientTasks.tsx";
 import PatientCheckIn from "./pages/PatientCheckIn.tsx";
-import PatientEducation from "./pages/PatientEducation.tsx";
+import PatientResources from "./pages/PatientResources.tsx";
 import Messages from "./pages/Messages.tsx";
 import PatientHealthReport from "./pages/PatientHealthReport.tsx";
 import DoctorDashboard from "./pages/DoctorDashboard.tsx";
@@ -42,7 +42,7 @@ const router = createBrowserRouter([
 					{ path: "home", element: <PatientHome /> },
 					{ path: "tasks", element: <PatientTasks /> },
 					{ path: "checkin", element: <PatientCheckIn /> },
-					{ path: "education", element: <PatientEducation /> },
+					{ path: "resources", element: <PatientResources /> },
 					{ path: "messages", element: <Messages /> },
 					{ path: "reports", element: <PatientHealthReport /> },
 				],

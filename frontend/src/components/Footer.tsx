@@ -7,7 +7,7 @@ function Footer() {
 					<div className="col-span-2 lg:col-span-2">
 						<a href="#" className="flex items-center space-x-2">
 							<span className="text-2xl font-bold text-white">
-								CarePaath
+								CarePath
 							</span>
 						</a>
 						<p className="mt-4 text-sm max-w-xs">
@@ -15,7 +15,7 @@ function Footer() {
 							patients and monitoring recovery.
 						</p>
 						<p className="mt-6 text-xs">
-							&copy; 2025 CarePaath. All rights reserved.
+							&copy; 2025 CarePath. All rights reserved.
 						</p>
 					</div>
 
@@ -113,14 +113,6 @@ function Footer() {
 									className="text-sm hover:text-white transition-colors"
 								>
 									Terms of Service
-								</a>
-							</li>
-							<li>
-								<a
-									href="#"
-									className="text-sm hover:text-white transition-colors"
-								>
-									HIPAA Compliance
 								</a>
 							</li>
 						</ul>

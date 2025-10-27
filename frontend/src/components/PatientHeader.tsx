@@ -5,9 +5,10 @@ function PatientHeader() {
 		"home",
 		"tasks",
 		"checkin",
-		"education",
+		"resources",
 		"messages",
 		"reports",
+		"profile",
 	];
 
 	return (

@@ -36,7 +36,7 @@ function Header() {
 				{/* Logo */}
 				<a href="#" className="flex items-center space-x-2">
 					<span className="text-2xl font-bold text-gray-900">
-						CarePaath
+						CarePath
 					</span>
 				</a>
 
@@ -65,7 +65,7 @@ function Header() {
 				{/* CTA & Mobile Menu Button */}
 				<div className="flex items-center space-x-4">
 					<a
-						href="#demo"
+						href="/login"
 						className="hidden sm:inline-block px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all"
 					>
 						Login

@@ -8,35 +8,6 @@ import { Button } from "@/components/ui/button";
 function MetricCard({
 	label,
 	value,
-	trend,
-	trendLabel,
-	isPositiveTrend,
-}: {
-	label: string;
-	value: string;
-	trend: number;
-	trendLabel: string;
-	isPositiveTrend: boolean;
-}) {
-	const trendColor = isPositiveTrend ? "text-green-600" : "text-red-600";
-	const trendIcon = isPositiveTrend ? "↑" : "↓";
-
-	return (
-		<Card className="p-4">
-			<p className="text-sm text-muted-foreground">{label}</p>
-			<p className="text-3xl font-bold text-primary mt-2">{value}</p>
-			<p className={`text-xs mt-2 ${trendColor}`}>
-				{trendIcon} {Math.abs(trend)}
-				{trendLabel}
-			</p>
-		</Card>
-	);
-}
-
-// Secondary Metric Card Component
-function SecondaryMetricCard({
-	label,
-	value,
 	borderColor,
 }: {
 	label: string;
@@ -82,16 +53,6 @@ function RiskDistributionItem({
 					style={{ width: `${percentage}%` }}
 				/>
 			</div>
-		</div>
-	);
-}
-
-// Insight Item Component
-function InsightItem({ text }: { text: string }) {
-	return (
-		<div className="flex gap-3">
-			<div className="w-2 h-2 bg-primary rounded-full mt-2 shrink-0" />
-			<p className="text-sm text-foreground">{text}</p>
 		</div>
 	);
 }
@@ -215,56 +176,24 @@ function Analytics() {
 				</div>
 			</div>
 
-			{/* Primary KPIs */}
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-				<MetricCard
-					label="Readmission Rate"
-					value={`${data.readmissionRate}%`}
-					trend={data.readmissionTrend}
-					trendLabel="% vs previous period"
-					isPositiveTrend={data.readmissionTrend < 0}
-				/>
-				<MetricCard
-					label="ER Visit Reduction"
-					value={`${data.erVisitReduction}%`}
-					trend={data.erVisitTrend}
-					trendLabel="% vs previous period"
-					isPositiveTrend={data.erVisitTrend > 0}
-				/>
-				<MetricCard
-					label="Avg Length of Stay"
-					value={`${data.avgLengthOfStay}d`}
-					trend={data.lossTrend}
-					trendLabel=" days vs previous period"
-					isPositiveTrend={data.lossTrend < 0}
-				/>
-				<MetricCard
-					label="Patient Adherence"
-					value={`${data.adherence}%`}
-					trend={data.adherenceTrend}
-					trendLabel="% vs previous period"
-					isPositiveTrend={data.adherenceTrend > 0}
-				/>
-			</div>
-
 			{/* Secondary Metrics */}
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-				<SecondaryMetricCard
+				<MetricCard
 					label="Total Patients"
 					value={data.totalPatients}
 					borderColor="border-l-blue-500"
 				/>
-				<SecondaryMetricCard
+				<MetricCard
 					label="Recovered"
 					value={data.recoveredPatients}
 					borderColor="border-l-green-500"
 				/>
-				<SecondaryMetricCard
+				<MetricCard
 					label="Active Alerts"
 					value={data.activeAlerts}
 					borderColor="border-l-red-500"
 				/>
-				<SecondaryMetricCard
+				<MetricCard
 					label="Check-ins Completed"
 					value={data.completedCheckIns}
 					borderColor="border-l-purple-500"
@@ -348,29 +277,6 @@ function Analytics() {
 							))}
 						</tbody>
 					</table>
-				</div>
-			</Card>
-
-			{/* Insights */}
-			<Card className="p-6 space-y-4 bg-accent/5 border-accent/20">
-				<h2 className="font-semibold text-lg text-foreground">
-					Key Insights
-				</h2>
-				<div className="space-y-3">
-					<InsightItem
-						text={`Readmission rates have improved by ${Math.abs(
-							data.readmissionTrend
-						)}% compared to the previous period, indicating better post-operative care.`}
-					/>
-					<InsightItem
-						text={`Patient adherence is at ${data.adherence}%, with ACL Repair procedures showing the highest compliance rates at 92%.`}
-					/>
-					<InsightItem
-						text={`${riskDistribution[2].count} patients currently require close monitoring. Consider scheduling follow-up calls for critical cases.`}
-					/>
-					<InsightItem
-						text={`ER visit reduction of ${data.erVisitReduction}% demonstrates the effectiveness of the digital care pathway in preventing unnecessary emergency visits.`}
-					/>
 				</div>
 			</Card>
 		</div>

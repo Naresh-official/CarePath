@@ -238,7 +238,7 @@ function Messages() {
 			</div>
 
 			{/* Chat Area */}
-			<div className="flex-1 flex flex-col">
+			<div className="flex-1 overflow-auto flex flex-col">
 				{/* Header with Video Call Button */}
 				<div className="pb-4 border-b border-border mb-4 flex items-center justify-between">
 					<div>
@@ -354,7 +354,7 @@ function Messages() {
 				<Card className="p-4 bg-yellow-50 border-yellow-200 text-sm text-yellow-800 mb-4">
 					<p>
 						This channel is for routine questions. For emergencies,
-						call 911.
+						call 108.
 					</p>
 				</Card>
 

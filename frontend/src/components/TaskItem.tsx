@@ -5,6 +5,7 @@ interface TaskItemProps {
 }
 
 function TaskItem({ completed, title, time }: TaskItemProps) {
+	// TODO : make the completed no reversible once checked
 	return (
 		<div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border hover:border-primary/50 transition-colors">
 			<div

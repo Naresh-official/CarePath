@@ -58,7 +58,7 @@ function Roles() {
 						A Single Platform for Every Role
 					</h2>
 					<p className="mt-4 text-lg text-gray-600">
-						CarePaath connects patients, care teams, and
+						CarePath connects patients, care teams, and
 						administrators on one integrated, HIPAA-compliant
 						platform.
 					</p>
