@@ -1,7 +1,18 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 
-const userSchema = new mongoose.Schema(
+export interface IUser extends Document {
+	email: string;
+	password: string;
+	role: "patient" | "doctor" | "admin";
+	isActive: boolean;
+	lastLogin?: Date;
+	createdAt: Date;
+	updatedAt: Date;
+	comparePassword(candidatePassword: string): Promise<boolean>;
+}
+
+const userSchema = new Schema<IUser>(
 	{
 		email: {
 			type: String,
@@ -37,7 +48,9 @@ userSchema.pre("save", async function (next) {
 	next();
 });
 
-userSchema.methods.comparePassword = async function (candidatePassword) {
+userSchema.methods.comparePassword = async function (
+	candidatePassword: string
+): Promise<boolean> {
 	return await bcrypt.compare(candidatePassword, this.password);
 };
 
@@ -47,6 +60,6 @@ userSchema.methods.toJSON = function () {
 	return obj;
 };
 
-const User = mongoose.model("User", userSchema);
+const User: Model<IUser> = mongoose.model<IUser>("User", userSchema);
 
 export default User;

@@ -1,9 +1,37 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const symptomCheckInSchema = new mongoose.Schema(
+export interface ISymptomCheckIn extends Document {
+	patientId: mongoose.Types.ObjectId;
+	painLevel: number;
+	temperature: number;
+	bloodPressure?: {
+		systolic?: number;
+		diastolic?: number;
+		formatted?: string;
+	};
+	mood: "poor" | "okay" | "good" | "excellent";
+	notes?: string;
+	image?: {
+		url?: string;
+		filename?: string;
+		uploadedAt?: Date;
+	};
+	symptoms?: Array<{
+		type?: string;
+		description?: string;
+	}>;
+	flaggedForReview: boolean;
+	reviewedBy?: mongoose.Types.ObjectId;
+	reviewedAt?: Date;
+	checkInDate: Date;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const symptomCheckInSchema = new Schema<ISymptomCheckIn>(
 	{
 		patientId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Patient",
 			required: true,
 		},
@@ -47,7 +75,7 @@ const symptomCheckInSchema = new mongoose.Schema(
 			default: false,
 		},
 		reviewedBy: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 		},
 		reviewedAt: {
@@ -63,6 +91,9 @@ const symptomCheckInSchema = new mongoose.Schema(
 
 symptomCheckInSchema.index({ patientId: 1, checkInDate: -1 });
 
-const SymptomCheckIn = mongoose.model("SymptomCheckIn", symptomCheckInSchema);
+const SymptomCheckIn: Model<ISymptomCheckIn> = mongoose.model<ISymptomCheckIn>(
+	"SymptomCheckIn",
+	symptomCheckInSchema
+);
 
 export default SymptomCheckIn;

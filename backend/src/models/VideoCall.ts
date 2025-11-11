@@ -1,14 +1,27 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const videoCallSchema = new mongoose.Schema(
+export interface IVideoCall extends Document {
+	patientId: mongoose.Types.ObjectId;
+	clinicianId: mongoose.Types.ObjectId;
+	startTime: Date;
+	endTime?: Date;
+	duration?: number;
+	status: "scheduled" | "ringing" | "connected" | "completed" | "cancelled";
+	callType: "video" | "audio";
+	notes?: string;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const videoCallSchema = new Schema<IVideoCall>(
 	{
 		patientId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Patient",
 			required: true,
 		},
 		clinicianId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 			required: true,
 		},
@@ -43,6 +56,9 @@ const videoCallSchema = new mongoose.Schema(
 videoCallSchema.index({ patientId: 1, startTime: -1 });
 videoCallSchema.index({ clinicianId: 1, startTime: -1 });
 
-const VideoCall = mongoose.model("VideoCall", videoCallSchema);
+const VideoCall: Model<IVideoCall> = mongoose.model<IVideoCall>(
+	"VideoCall",
+	videoCallSchema
+);
 
 export default VideoCall;

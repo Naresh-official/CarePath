@@ -1,14 +1,40 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const assignmentSchema = new mongoose.Schema(
+export interface IAssignmentPermissions {
+	canViewMedicalRecords?: boolean;
+	canEditCarePlan?: boolean;
+	canPrescribeMedication?: boolean;
+	canSendMessages?: boolean;
+}
+
+export interface IAssignment extends Document {
+	patientId: mongoose.Types.ObjectId;
+	clinicianId: mongoose.Types.ObjectId;
+	role:
+		| "Primary Surgeon"
+		| "Primary Cardiologist"
+		| "Care Coordinator"
+		| "Physical Therapist"
+		| "Anesthesiologist"
+		| "Nurse"
+		| "Secondary Clinician";
+	assignedDate: Date;
+	isActive: boolean;
+	endDate?: Date;
+	permissions?: IAssignmentPermissions;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const assignmentSchema = new Schema<IAssignment>(
 	{
 		patientId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Patient",
 			required: true,
 		},
 		clinicianId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 			required: true,
 		},
@@ -61,6 +87,9 @@ const assignmentSchema = new mongoose.Schema(
 assignmentSchema.index({ patientId: 1, isActive: 1 });
 assignmentSchema.index({ clinicianId: 1, isActive: 1 });
 
-const Assignment = mongoose.model("Assignment", assignmentSchema);
+const Assignment: Model<IAssignment> = mongoose.model<IAssignment>(
+	"Assignment",
+	assignmentSchema
+);
 
 export default Assignment;

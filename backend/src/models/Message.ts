@@ -1,6 +1,26 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const messageSchema = new mongoose.Schema(
+export interface IAttachment {
+	type?: string;
+	url?: string;
+	filename?: string;
+}
+
+export interface IMessage extends Document {
+	conversationId: string;
+	senderId: mongoose.Types.ObjectId;
+	receiverId: mongoose.Types.ObjectId;
+	senderType: "patient" | "clinician";
+	text: string;
+	status: "sent" | "delivered" | "read";
+	readAt?: Date;
+	attachments?: IAttachment[];
+	isSystemMessage: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const messageSchema = new Schema<IMessage>(
 	{
 		conversationId: {
 			type: String,
@@ -8,12 +28,12 @@ const messageSchema = new mongoose.Schema(
 			index: true,
 		},
 		senderId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
 		},
 		receiverId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
 		},
@@ -53,6 +73,9 @@ const messageSchema = new mongoose.Schema(
 messageSchema.index({ conversationId: 1, createdAt: -1 });
 messageSchema.index({ receiverId: 1, status: 1 });
 
-const Message = mongoose.model("Message", messageSchema);
+const Message: Model<IMessage> = mongoose.model<IMessage>(
+	"Message",
+	messageSchema
+);
 
 export default Message;

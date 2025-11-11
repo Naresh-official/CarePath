@@ -1,14 +1,41 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const noteSchema = new mongoose.Schema(
+export interface INoteAttachment {
+	filename?: string;
+	url?: string;
+	fileType?: string;
+	uploadedAt?: Date;
+}
+
+export interface INote extends Document {
+	patientId: mongoose.Types.ObjectId;
+	authorId: mongoose.Types.ObjectId;
+	type:
+		| "Clinical"
+		| "Progress"
+		| "Intervention"
+		| "Consultation"
+		| "Discharge"
+		| "Other";
+	title?: string;
+	content: string;
+	priority: "low" | "medium" | "high";
+	isPrivate: boolean;
+	attachments?: INoteAttachment[];
+	tags?: string[];
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const noteSchema = new Schema<INote>(
 	{
 		patientId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Patient",
 			required: true,
 		},
 		authorId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 			required: true,
 		},
@@ -58,6 +85,6 @@ const noteSchema = new mongoose.Schema(
 noteSchema.index({ patientId: 1, createdAt: -1 });
 noteSchema.index({ authorId: 1 });
 
-const Note = mongoose.model("Note", noteSchema);
+const Note: Model<INote> = mongoose.model<INote>("Note", noteSchema);
 
 export default Note;

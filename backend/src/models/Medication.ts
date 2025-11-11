@@ -1,9 +1,31 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const medicationSchema = new mongoose.Schema(
+export interface IMedicationSchedule {
+	time?: string;
+}
+
+export interface IMedication extends Document {
+	patientId: mongoose.Types.ObjectId;
+	name: string;
+	dosage: string;
+	frequency: string;
+	schedule?: IMedicationSchedule[];
+	startDate: Date;
+	endDate?: Date;
+	duration?: string;
+	instructions?: string;
+	sideEffects?: string[];
+	adherenceRate: number;
+	isActive: boolean;
+	prescribedBy?: mongoose.Types.ObjectId;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const medicationSchema = new Schema<IMedication>(
 	{
 		patientId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Patient",
 			required: true,
 		},
@@ -50,7 +72,7 @@ const medicationSchema = new mongoose.Schema(
 			default: true,
 		},
 		prescribedBy: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 		},
 	},
@@ -59,6 +81,9 @@ const medicationSchema = new mongoose.Schema(
 
 medicationSchema.index({ patientId: 1, isActive: 1 });
 
-const Medication = mongoose.model("Medication", medicationSchema);
+const Medication: Model<IMedication> = mongoose.model<IMedication>(
+	"Medication",
+	medicationSchema
+);
 
 export default Medication;

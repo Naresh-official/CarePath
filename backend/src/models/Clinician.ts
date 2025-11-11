@@ -1,9 +1,30 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const clinicianSchema = new mongoose.Schema(
+export interface IClinician extends Document {
+	userId: mongoose.Types.ObjectId;
+	firstName: string;
+	lastName: string;
+	role:
+		| "Surgeon"
+		| "Cardiologist"
+		| "Nurse"
+		| "Care Coordinator"
+		| "Physical Therapist"
+		| "Anesthesiologist";
+	phone?: string;
+	specialization?: string;
+	licenseNumber?: string;
+	verified: boolean;
+	status: "active" | "inactive" | "pending";
+	createdAt: Date;
+	updatedAt: Date;
+	fullName: string;
+}
+
+const clinicianSchema = new Schema<IClinician>(
 	{
 		userId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
 		},
@@ -54,10 +75,13 @@ const clinicianSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
-clinicianSchema.virtual("fullName").get(function () {
+clinicianSchema.virtual("fullName").get(function (this: IClinician) {
 	return `${this.firstName} ${this.lastName}`;
 });
 
-const Clinician = mongoose.model("Clinician", clinicianSchema);
+const Clinician: Model<IClinician> = mongoose.model<IClinician>(
+	"Clinician",
+	clinicianSchema
+);
 
 export default Clinician;

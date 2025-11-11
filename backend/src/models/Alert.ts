@@ -1,9 +1,42 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const alertSchema = new mongoose.Schema(
+export interface IAlertAction {
+	action?: string;
+	performedBy?: mongoose.Types.ObjectId;
+	performedAt?: Date;
+	notes?: string;
+}
+
+export interface IAlert extends Document {
+	patientId: mongoose.Types.ObjectId;
+	type:
+		| "High Fever"
+		| "Severe Pain"
+		| "Missed Medication"
+		| "Low Adherence"
+		| "Abnormal Vitals"
+		| "Wound Concern"
+		| "Check-in Completed"
+		| "Other";
+	severity: "normal" | "warning" | "critical";
+	message: string;
+	status: "active" | "resolved" | "dismissed";
+	triggeredBy?: {
+		source?: "symptom-checkin" | "medication" | "task" | "manual" | "system";
+		referenceId?: mongoose.Types.ObjectId;
+	};
+	assignedTo?: mongoose.Types.ObjectId;
+	actions?: IAlertAction[];
+	resolvedBy?: mongoose.Types.ObjectId;
+	resolvedAt?: Date;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const alertSchema = new Schema<IAlert>(
 	{
 		patientId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Patient",
 			required: true,
 		},
@@ -42,18 +75,18 @@ const alertSchema = new mongoose.Schema(
 				enum: ["symptom-checkin", "medication", "task", "manual", "system"],
 			},
 			referenceId: {
-				type: mongoose.Schema.Types.ObjectId,
+				type: Schema.Types.ObjectId,
 			},
 		},
 		assignedTo: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 		},
 		actions: [
 			{
 				action: String,
 				performedBy: {
-					type: mongoose.Schema.Types.ObjectId,
+					type: Schema.Types.ObjectId,
 					ref: "Clinician",
 				},
 				performedAt: Date,
@@ -61,7 +94,7 @@ const alertSchema = new mongoose.Schema(
 			},
 		],
 		resolvedBy: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 		},
 		resolvedAt: {
@@ -74,6 +107,6 @@ const alertSchema = new mongoose.Schema(
 alertSchema.index({ patientId: 1, status: 1, severity: 1 });
 alertSchema.index({ assignedTo: 1, status: 1 });
 
-const Alert = mongoose.model("Alert", alertSchema);
+const Alert: Model<IAlert> = mongoose.model<IAlert>("Alert", alertSchema);
 
 export default Alert;

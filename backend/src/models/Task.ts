@@ -1,9 +1,33 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const taskSchema = new mongoose.Schema(
+export interface ITask extends Document {
+	patientId: mongoose.Types.ObjectId;
+	title: string;
+	description?: string;
+	type:
+		| "medication"
+		| "exercise"
+		| "check-in"
+		| "appointment"
+		| "wound-check"
+		| "other";
+	scheduledTime: Date;
+	completed: boolean;
+	completedAt?: Date;
+	priority: "low" | "medium" | "high";
+	recurring?: {
+		enabled?: boolean;
+		frequency?: "daily" | "weekly" | "monthly";
+		endDate?: Date;
+	};
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const taskSchema = new Schema<ITask>(
 	{
 		patientId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Patient",
 			required: true,
 		},
@@ -61,6 +85,6 @@ const taskSchema = new mongoose.Schema(
 
 taskSchema.index({ patientId: 1, scheduledTime: 1 });
 
-const Task = mongoose.model("Task", taskSchema);
+const Task: Model<ITask> = mongoose.model<ITask>("Task", taskSchema);
 
 export default Task;

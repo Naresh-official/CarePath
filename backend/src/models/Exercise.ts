@@ -1,6 +1,36 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const exerciseSchema = new mongoose.Schema(
+export interface IExerciseInstruction {
+	step?: number;
+	description?: string;
+}
+
+export interface IExercise extends Document {
+	name: string;
+	description: string;
+	category:
+		| "Strength"
+		| "Flexibility"
+		| "Mobility"
+		| "Cardio"
+		| "Balance"
+		| "Rehabilitation";
+	difficulty: "Easy" | "Moderate" | "Hard";
+	duration: number;
+	instructions?: IExerciseInstruction[];
+	videoUrl?: string;
+	imageUrl?: string;
+	equipment?: string[];
+	targetAreas?: string[];
+	repetitions?: string;
+	sets?: number;
+	precautions?: string[];
+	isActive: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const exerciseSchema = new Schema<IExercise>(
 	{
 		name: {
 			type: String,
@@ -61,6 +91,9 @@ const exerciseSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
-const Exercise = mongoose.model("Exercise", exerciseSchema);
+const Exercise: Model<IExercise> = mongoose.model<IExercise>(
+	"Exercise",
+	exerciseSchema
+);
 
 export default Exercise;

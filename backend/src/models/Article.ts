@@ -1,6 +1,24 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const articleSchema = new mongoose.Schema(
+export interface IArticle extends Document {
+	title: string;
+	description: string;
+	content: string;
+	category: "Recovery" | "Medications" | "Safety" | "Wellness" | "Nutrition";
+	duration: string;
+	author?: mongoose.Types.ObjectId;
+	tags?: string[];
+	imageUrl?: string;
+	videoUrl?: string;
+	relatedArticles?: mongoose.Types.ObjectId[];
+	readCount: number;
+	isPublished: boolean;
+	publishedAt?: Date;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+const articleSchema = new Schema<IArticle>(
 	{
 		title: {
 			type: String,
@@ -25,7 +43,7 @@ const articleSchema = new mongoose.Schema(
 			required: true,
 		},
 		author: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Clinician",
 		},
 		tags: [String],
@@ -37,7 +55,7 @@ const articleSchema = new mongoose.Schema(
 		},
 		relatedArticles: [
 			{
-				type: mongoose.Schema.Types.ObjectId,
+				type: Schema.Types.ObjectId,
 				ref: "Article",
 			},
 		],
@@ -58,6 +76,9 @@ const articleSchema = new mongoose.Schema(
 
 articleSchema.index({ category: 1, isPublished: 1 });
 
-const Article = mongoose.model("Article", articleSchema);
+const Article: Model<IArticle> = mongoose.model<IArticle>(
+	"Article",
+	articleSchema
+);
 
 export default Article;

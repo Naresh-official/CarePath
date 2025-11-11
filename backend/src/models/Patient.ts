@@ -1,9 +1,35 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-const patientSchema = new mongoose.Schema(
+export interface IPatient extends Document {
+	userId: mongoose.Types.ObjectId;
+	firstName: string;
+	lastName: string;
+	dateOfBirth: Date;
+	phone?: string;
+	address?: {
+		street?: string;
+		city?: string;
+		state?: string;
+		zipCode?: string;
+	};
+	procedure: string;
+	procedureDate: Date;
+	carePathway?: mongoose.Types.ObjectId;
+	riskLevel: "stable" | "monitor" | "critical";
+	adherenceRate: number;
+	recoveryProgress: number;
+	daysPostOp: number;
+	status: "active" | "recovered" | "inactive";
+	createdAt: Date;
+	updatedAt: Date;
+	fullName: string;
+	age: number;
+}
+
+const patientSchema = new Schema<IPatient>(
 	{
 		userId: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
 		},
@@ -40,7 +66,7 @@ const patientSchema = new mongoose.Schema(
 			required: true,
 		},
 		carePathway: {
-			type: mongoose.Schema.Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "CarePathway",
 		},
 		riskLevel: {
@@ -73,11 +99,11 @@ const patientSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
-patientSchema.virtual("fullName").get(function () {
+patientSchema.virtual("fullName").get(function (this: IPatient) {
 	return `${this.firstName} ${this.lastName}`;
 });
 
-patientSchema.virtual("age").get(function () {
+patientSchema.virtual("age").get(function (this: IPatient) {
 	const today = new Date();
 	const birthDate = new Date(this.dateOfBirth);
 	let age = today.getFullYear() - birthDate.getFullYear();
@@ -91,6 +117,9 @@ patientSchema.virtual("age").get(function () {
 	return age;
 });
 
-const Patient = mongoose.model("Patient", patientSchema);
+const Patient: Model<IPatient> = mongoose.model<IPatient>(
+	"Patient",
+	patientSchema
+);
 
 export default Patient;
