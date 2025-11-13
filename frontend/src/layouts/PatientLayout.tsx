@@ -1,11 +1,14 @@
 import PatientHeader from "@/components/PatientHeader";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { Outlet } from "react-router";
 
 function PatientLayout() {
 	return (
 		<div>
-			<PatientHeader />
-			<Outlet />
+			<ProtectedRoute roles={["patient"]}>
+				<PatientHeader />
+				<Outlet />
+			</ProtectedRoute>
 		</div>
 	);
 }

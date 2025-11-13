@@ -11,7 +11,7 @@ function AdminSidebar({
 	setMobileMenuOpen,
 }: AdminSidebarProps) {
 	const adminRoutes = [
-		{ path: "users", label: "User Management" },
+		{ path: "user-management", label: "User Management" },
 		{ path: "configuration", label: "Platform Configuration" },
 	];
 

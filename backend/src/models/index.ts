@@ -1,6 +1,6 @@
 import User from "./User.js";
 import Patient from "./Patient.js";
-import Clinician from "./Clinician.js";
+import Doctor from "./Doctor.js";
 import Task from "./Task.js";
 import Medication from "./Medication.js";
 import SymptomCheckIn from "./SymptomCheckIn.js";
@@ -17,7 +17,7 @@ import ReadHistory from "./ReadHistory.js";
 export {
 	User,
 	Patient,
-	Clinician,
+	Doctor,
 	Task,
 	Medication,
 	SymptomCheckIn,

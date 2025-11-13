@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -11,56 +11,90 @@ import {
 	SelectContent,
 	SelectItem,
 } from "@/components/ui/select";
+import { loginSchema } from "@schemas/auth.schema";
+import { toast } from "sonner";
+import { z } from "zod";
+import axios, { isAxiosError } from "axios";
+import { useNavigate } from "react-router";
+import { useAuth } from "@/context/AuthContext";
 
 function Login() {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [role, setRole] = useState<"patient" | "doctor" | "admin">("patient");
 	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [showPassword, setShowPassword] = useState(false);
 
-	const emailIsValid = (e: string) =>
-		/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
-	const passwordIsValid = (p: string) => p.trim().length >= 6;
-	const roleIsValid = (r: string) =>
-		["patient", "doctor", "admin"].includes(r);
+	const navigate = useNavigate();
 
-	const canSubmit =
-		emailIsValid(email) &&
-		passwordIsValid(password) &&
-		roleIsValid(role) &&
-		!loading;
+	const { user, loading: authLoading } = useAuth();
+
+	useEffect(() => {
+		if (user && !authLoading) {
+			if (user.role === "patient") {
+				navigate("/patient/home");
+			} else if (user.role === "doctor") {
+				navigate("/doctor/dashboard");
+			} else if (user.role === "admin") {
+				navigate("/admin/user-management");
+			}
+		}
+	}, [user, navigate, authLoading]);
 
 	const handleSubmit = async (ev: React.FormEvent) => {
 		ev.preventDefault();
-		setError(null);
-		if (!emailIsValid(email)) {
-			setError("Please enter a valid email address.");
+
+		if (!email || !password) {
+			toast.error("Please fill in all fields");
 			return;
 		}
-		if (!passwordIsValid(password)) {
-			setError("Password must be at least 6 characters.");
+
+		const result = loginSchema.safeParse({ email, password, role });
+		if (!result.success) {
+			const firstError = z.flattenError(result.error).fieldErrors;
+			toast.error(
+				firstError.email?.[0] ||
+					firstError.password?.[0] ||
+					firstError.role?.[0] ||
+					"Invalid input"
+			);
 			return;
 		}
-		if (!roleIsValid(role)) {
-			setError("Please select a role.");
-			return;
-		}
+
 		try {
 			setLoading(true);
-			// Replace with real API call
-			await new Promise((res) => setTimeout(res, 900));
-			setError(null);
-			alert(
-				`Logged in (demo) — replace with real submit.\nEmail: ${email}\nRole: ${role}`
+
+			const { data } = await axios.post(
+				`${import.meta.env.VITE_BACKEND_URL}/auth/login`,
+				result.data,
+				{ withCredentials: true }
 			);
-		} catch (err: unknown) {
-			if (err instanceof Error) {
-				setError(err.message);
-				return;
+			if (data.success) {
+				toast.success("Login successful!");
+				if (data.data.role === "patient") {
+					navigate("/patient/home");
+				} else if (data.data.role === "doctor") {
+					navigate("/doctor/dashboard");
+				} else if (data.data.role === "admin") {
+					navigate("/admin/user-management");
+				}
 			}
-			setError("Unexpected error. Please try again.");
+		} catch (err: unknown) {
+			if (isAxiosError(err)) {
+				if (
+					err.response &&
+					err.response.data &&
+					err.response.data.error
+				) {
+					toast.error(err.response.data.message);
+					return;
+				}
+			}
+			if (err instanceof Error) {
+				toast.error(err.message);
+			} else {
+				toast.error("Unexpected error. Please try again.");
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -99,9 +133,6 @@ function Login() {
 									className="pl-10"
 									required
 									autoComplete="email"
-									aria-invalid={
-										!emailIsValid(email) && email.length > 0
-									}
 								/>
 							</div>
 						</div>
@@ -125,10 +156,6 @@ function Login() {
 									className="pl-10 pr-12"
 									required
 									autoComplete="current-password"
-									aria-invalid={
-										!passwordIsValid(password) &&
-										password.length > 0
-									}
 								/>
 								<button
 									type="button"
@@ -175,17 +202,13 @@ function Login() {
 									<SelectItem value="admin">Admin</SelectItem>
 								</SelectContent>
 							</Select>
-            </div>
-            
-						{error && (
-							<div className="text-sm text-red-600">{error}</div>
-						)}
+						</div>
 
 						<div className="pt-2">
 							<Button
 								type="submit"
 								className="w-full"
-								disabled={!canSubmit}
+								disabled={loading}
 							>
 								{loading ? "Signing in..." : "Sign in"}
 							</Button>

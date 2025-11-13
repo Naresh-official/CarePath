@@ -4,6 +4,8 @@ import "./index.css";
 
 import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
+
+// Pages and Layouts
 import Landing from "./pages/Landing.tsx";
 import Login from "./pages/Login.tsx";
 import PatientLayout from "./layouts/PatientLayout.tsx";
@@ -22,6 +24,10 @@ import AdminLayout from "./layouts/AdminLayout.tsx";
 import UserManagementDashboard from "./pages/UserManagementDashboard.tsx";
 import PlatformConfiguration from "./pages/PlatformConfiguration.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import AccessDenied from "./pages/AccessDenied.tsx";
+
+import { Toaster } from "./components/ui/sonner.tsx";
+import { AuthProvider } from "./context/AuthContext.tsx";
 
 const router = createBrowserRouter([
 	{
@@ -61,12 +67,19 @@ const router = createBrowserRouter([
 				path: "/admin",
 				element: <AdminLayout />,
 				children: [
-					{ path: "users", element: <UserManagementDashboard /> },
+					{
+						path: "user-management",
+						element: <UserManagementDashboard />,
+					},
 					{
 						path: "configuration",
 						element: <PlatformConfiguration />,
 					},
 				],
+			},
+			{
+				path: "/access-denied",
+				element: <AccessDenied />,
 			},
 			{
 				path: "*",
@@ -78,6 +91,9 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		<RouterProvider router={router} />
+		<AuthProvider>
+			<RouterProvider router={router} />
+			<Toaster />
+		</AuthProvider>
 	</StrictMode>
 );

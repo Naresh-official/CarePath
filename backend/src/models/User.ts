@@ -3,12 +3,15 @@ import bcrypt from "bcryptjs";
 
 export interface IUser extends Document {
 	email: string;
+	firstName: string;
+	lastName: string;
 	password: string;
 	role: "patient" | "doctor" | "admin";
 	isActive: boolean;
 	lastLogin?: Date;
 	createdAt: Date;
 	updatedAt: Date;
+	fullName: string;
 	comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -21,10 +24,21 @@ const userSchema = new Schema<IUser>(
 			lowercase: true,
 			trim: true,
 		},
+		firstName: {
+			type: String,
+			required: true,
+			trim: true,
+		},
+		lastName: {
+			type: String,
+			required: true,
+			trim: true,
+		},
 		password: {
 			type: String,
 			required: true,
 			minlength: 6,
+			select: false,
 		},
 		role: {
 			type: String,
@@ -39,7 +53,15 @@ const userSchema = new Schema<IUser>(
 			type: Date,
 		},
 	},
-	{ timestamps: true }
+	{
+		timestamps: true,
+		toJSON: {
+			virtuals: true,
+		},
+		toObject: {
+			virtuals: true,
+		},
+	}
 );
 
 userSchema.pre("save", async function (next) {
@@ -54,11 +76,9 @@ userSchema.methods.comparePassword = async function (
 	return await bcrypt.compare(candidatePassword, this.password);
 };
 
-userSchema.methods.toJSON = function () {
-	const obj = this.toObject();
-	delete obj.password;
-	return obj;
-};
+userSchema.virtual("fullName").get(function (this: IUser) {
+	return `${this.firstName} ${this.lastName}`;
+});
 
 const User: Model<IUser> = mongoose.model<IUser>("User", userSchema);
 

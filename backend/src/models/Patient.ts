@@ -2,8 +2,6 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 
 export interface IPatient extends Document {
 	userId: mongoose.Types.ObjectId;
-	firstName: string;
-	lastName: string;
 	dateOfBirth: Date;
 	phone?: string;
 	address?: {
@@ -22,7 +20,6 @@ export interface IPatient extends Document {
 	status: "active" | "recovered" | "inactive";
 	createdAt: Date;
 	updatedAt: Date;
-	fullName: string;
 	age: number;
 }
 
@@ -32,16 +29,6 @@ const patientSchema = new Schema<IPatient>(
 			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
-		},
-		firstName: {
-			type: String,
-			required: true,
-			trim: true,
-		},
-		lastName: {
-			type: String,
-			required: true,
-			trim: true,
 		},
 		dateOfBirth: {
 			type: Date,
@@ -86,22 +73,14 @@ const patientSchema = new Schema<IPatient>(
 			min: 0,
 			max: 100,
 		},
-		daysPostOp: {
-			type: Number,
-			default: 0,
-		},
 		status: {
 			type: String,
-			enum: ["active", "recovered", "inactive"],
+			enum: ["active", "recovered"],
 			default: "active",
 		},
 	},
 	{ timestamps: true }
 );
-
-patientSchema.virtual("fullName").get(function (this: IPatient) {
-	return `${this.firstName} ${this.lastName}`;
-});
 
 patientSchema.virtual("age").get(function (this: IPatient) {
 	const today = new Date();
@@ -115,6 +94,14 @@ patientSchema.virtual("age").get(function (this: IPatient) {
 		age--;
 	}
 	return age;
+});
+
+patientSchema.virtual("daysPostOp").get(function (this: IPatient) {
+	const today = new Date();
+	const procedureDate = new Date(this.procedureDate);
+	const diffTime = Math.abs(today.getTime() - procedureDate.getTime());
+	const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+	return diffDays;
 });
 
 const Patient: Model<IPatient> = mongoose.model<IPatient>(
