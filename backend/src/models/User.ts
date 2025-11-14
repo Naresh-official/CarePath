@@ -45,10 +45,6 @@ const userSchema = new Schema<IUser>(
 			enum: ["patient", "doctor", "admin"],
 			required: true,
 		},
-		isActive: {
-			type: Boolean,
-			default: true,
-		},
 		lastLogin: {
 			type: Date,
 		},
@@ -78,6 +74,12 @@ userSchema.methods.comparePassword = async function (
 
 userSchema.virtual("fullName").get(function (this: IUser) {
 	return `${this.firstName} ${this.lastName}`;
+});
+
+userSchema.virtual("isActive").get(function (this: IUser) {
+	return this.lastLogin
+		? (Date.now() - this.lastLogin.getTime()) / (1000 * 60 * 60 * 24) <= 15 // Active if logged in within last 15 days
+		: false;
 });
 
 const User: Model<IUser> = mongoose.model<IUser>("User", userSchema);

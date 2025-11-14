@@ -17,7 +17,7 @@ export const getAllPatients = asyncHandler(
 		let patients = await Patient.find()
 			.populate({
 				path: "userId",
-				select: "firstName lastName email",
+				select: "firstName lastName email isActive",
 			})
 			.sort({ createdAt: -1 })
 			.skip(skip)

@@ -12,8 +12,6 @@ export interface IDoctor extends Document {
 	phone?: string;
 	specialization?: string;
 	licenseNumber?: string;
-	verified: boolean;
-	status: "active" | "inactive" | "pending";
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -49,15 +47,6 @@ const doctorSchema = new Schema<IDoctor>(
 		licenseNumber: {
 			type: String,
 			trim: true,
-		},
-		verified: {
-			type: Boolean,
-			default: false,
-		},
-		status: {
-			type: String,
-			enum: ["active", "inactive", "pending"],
-			default: "pending",
 		},
 	},
 	{ timestamps: true }

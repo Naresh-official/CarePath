@@ -38,12 +38,12 @@ export interface IPatient {
 		fullName: string;
 		email: string;
 		_id: string;
+		isActive: boolean;
 	};
 	dateOfBirth: Date;
 	procedure: string;
 	procedureDate: Date;
 	riskLevel: "critical" | "stable" | "monitor";
-	status: "active" | "inactive";
 }
 
 export default function PatientEnrollment() {
@@ -848,8 +848,14 @@ export default function PatientEnrollment() {
 									<p className="text-sm text-muted-foreground">
 										Procedure: {patient.procedure}
 									</p>
-									<span className="inline-block mt-2 px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-										{patient.status === "active"
+									<span
+										className={`inline-block mt-2 px-2 py-1 rounded text-xs font-medium ${
+											patient.userId.isActive
+												? "bg-green-100 text-green-800"
+												: "bg-gray-100 text-gray-800"
+										}`}
+									>
+										{patient.userId.isActive
 											? "Active"
 											: "Inactive"}
 									</span>
