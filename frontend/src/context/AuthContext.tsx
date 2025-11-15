@@ -17,6 +17,8 @@ export interface AuthUser {
 interface AuthContextType {
 	user: AuthUser | null;
 	loading: boolean;
+	setUser: (user: AuthUser | null) => void; // Add this
+	refetchUser: () => Promise<void>; // Optional: to refetch user
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -29,27 +31,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 	const [user, setUser] = useState<AuthUser | null>(null);
 	const [loading, setLoading] = useState<boolean>(true);
 
-	useEffect(() => {
-		(async () => {
-			try {
-				const { data } = await axios.get(
-					`${import.meta.env.VITE_BACKEND_URL}/auth/me`,
-					{
-						withCredentials: true,
-					}
-				);
-
-				setUser(data.data);
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			} catch (err: unknown) {
-				setUser(null);
-			}
+	const fetchUser = async () => {
+		try {
+			const { data } = await axios.get(
+				`${import.meta.env.VITE_BACKEND_URL}/auth/me`,
+				{
+					withCredentials: true,
+				}
+			);
+			setUser(data.data);
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		} catch (err: unknown) {
+			setUser(null);
+		} finally {
 			setLoading(false);
-		})();
+		}
+	};
+
+	useEffect(() => {
+		fetchUser();
 	}, []);
 
 	return (
-		<AuthContext.Provider value={{ user, loading }}>
+		<AuthContext.Provider
+			value={{ user, loading, setUser, refetchUser: fetchUser }}
+		>
 			{children}
 		</AuthContext.Provider>
 	);

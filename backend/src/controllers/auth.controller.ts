@@ -33,10 +33,14 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 		{ expiresIn: "7d" }
 	);
 
+	const isProduction = process.env.NODE_ENV === "production";
+
 	res.cookie("authToken", token, {
 		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
+		secure: isProduction, // false in development
 		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+		sameSite: isProduction ? "none" : "lax", // "lax" in development
+		path: "/",
 	});
 
 	return res.sendResponse({
@@ -53,10 +57,15 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
+	const isProduction = process.env.NODE_ENV === "production";
+
 	res.clearCookie("authToken", {
 		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
+		secure: isProduction, // Must match login
+		sameSite: isProduction ? "none" : "lax", // Must match login
+		path: "/",
 	});
+
 	return res.sendResponse({
 		statusCode: 200,
 		success: true,

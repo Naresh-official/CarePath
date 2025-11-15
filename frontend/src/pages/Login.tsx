@@ -27,7 +27,7 @@ function Login() {
 
 	const navigate = useNavigate();
 
-	const { user, loading: authLoading } = useAuth();
+	const { user, loading: authLoading, refetchUser } = useAuth();
 
 	useEffect(() => {
 		if (user && !authLoading) {
@@ -69,14 +69,20 @@ function Login() {
 				result.data,
 				{ withCredentials: true }
 			);
+
 			if (data.success) {
+				// Refetch user to update context
+				await refetchUser();
+
 				toast.success("Login successful!");
+
+				// Navigate based on role
 				if (data.data.role === "patient") {
-					navigate("/patient/home");
+					navigate("/patient/home", { replace: true });
 				} else if (data.data.role === "doctor") {
-					navigate("/doctor/dashboard");
+					navigate("/doctor/dashboard", { replace: true });
 				} else if (data.data.role === "admin") {
-					navigate("/admin/user-management");
+					navigate("/admin/user-management", { replace: true });
 				}
 			}
 		} catch (err: unknown) {
