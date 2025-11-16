@@ -1,12 +1,30 @@
 import { Response, Request } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
-import { loginSchema } from "../schemas/auth.schema.js";
 import User from "../models/User.js";
 import { ApiError } from "../utils/apiError.js";
 import jwt from "jsonwebtoken";
+import { validateRequest } from "../utils/validation.js";
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
-	const { email, password, role } = loginSchema.parse(req.body);
+	const { email, password, role } = req.body;
+
+	validateRequest([
+		{
+			field: "email",
+			value: email,
+			rules: { required: true, type: "email" },
+		},
+		{
+			field: "password",
+			value: password,
+			rules: { required: true, type: "string", minLength: 6 },
+		},
+		{
+			field: "role",
+			value: role,
+			rules: { required: true, enum: ["admin", "doctor", "patient"] },
+		},
+	]);
 
 	const user = await User.findOne({ email, role }).select("+password");
 

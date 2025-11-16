@@ -1,12 +1,9 @@
 import { Request, Response } from "express";
 import asyncHandler from "../utils/asyncHandler.js";
-import {
-	addPatientSchema,
-	updatePatientSchema,
-} from "../schemas/patient.schema.js";
 import User, { IUser } from "../models/User.js";
 import Patient, { IPatient } from "../models/Patient.js";
 import { ApiError } from "../utils/apiError.js";
+import { validateRequest } from "../utils/validation.js";
 
 export const getAllPatients = asyncHandler(
 	async (req: Request, res: Response) => {
@@ -71,29 +68,83 @@ export const getPatientById = asyncHandler(
 );
 
 export const addPatient = asyncHandler(async (req: Request, res: Response) => {
-	const validatedData = addPatientSchema.parse(req.body);
+	const {
+		firstName,
+		lastName,
+		email,
+		password,
+		dateOfBirth,
+		phone,
+		address,
+		procedure,
+		procedureDate,
+		riskLevel,
+	} = req.body;
 
-	const existingUser = await User.findOne({ email: validatedData.email });
+	validateRequest([
+		{
+			field: "firstName",
+			value: firstName,
+			rules: { required: true, type: "string", minLength: 1 },
+		},
+		{
+			field: "lastName",
+			value: lastName,
+			rules: { required: true, type: "string", minLength: 1 },
+		},
+		{
+			field: "email",
+			value: email,
+			rules: { required: true, type: "email" },
+		},
+		{
+			field: "password",
+			value: password,
+			rules: { required: true, type: "string", minLength: 6 },
+		},
+		{
+			field: "dateOfBirth",
+			value: dateOfBirth,
+			rules: { required: true, type: "date" },
+		},
+		{
+			field: "procedure",
+			value: procedure,
+			rules: { required: true, type: "string", minLength: 1 },
+		},
+		{
+			field: "procedureDate",
+			value: procedureDate,
+			rules: { required: true, type: "date" },
+		},
+		{
+			field: "riskLevel",
+			value: riskLevel,
+			rules: { enum: ["stable", "monitor", "critical"] },
+		},
+	]);
+
+	const existingUser = await User.findOne({ email });
 	if (existingUser) {
 		throw new ApiError("User with this email already exists", 400);
 	}
 
 	const user = await User.create({
-		firstName: validatedData.firstName,
-		lastName: validatedData.lastName,
-		email: validatedData.email,
-		password: validatedData.password,
+		firstName,
+		lastName,
+		email,
+		password,
 		role: "patient",
 	});
 
 	const patient = await Patient.create({
 		userId: user._id,
-		dateOfBirth: new Date(validatedData.dateOfBirth),
-		phone: validatedData.phone,
-		address: validatedData.address,
-		procedure: validatedData.procedure,
-		procedureDate: new Date(validatedData.procedureDate),
-		riskLevel: validatedData.riskLevel || "stable",
+		dateOfBirth: new Date(dateOfBirth),
+		phone,
+		address,
+		procedure,
+		procedureDate: new Date(procedureDate),
+		riskLevel: riskLevel || "stable",
 	});
 
 	return res.sendResponse({
@@ -114,7 +165,19 @@ export const addPatient = asyncHandler(async (req: Request, res: Response) => {
 export const updatePatient = asyncHandler(
 	async (req: Request, res: Response) => {
 		const { patientId } = req.params;
-		const validatedData = updatePatientSchema.parse(req.body);
+		const {
+			firstName,
+			lastName,
+			phone,
+			address,
+			dateOfBirth,
+			procedure,
+			procedureDate,
+			riskLevel,
+			adherenceRate,
+			recoveryProgress,
+			status,
+		} = req.body;
 
 		const patient = await Patient.findById(patientId).populate("userId");
 		if (!patient) {
@@ -122,27 +185,19 @@ export const updatePatient = asyncHandler(
 		}
 
 		const updateData: Partial<IPatient & IUser> = {};
-		if (validatedData.firstName !== undefined)
-			updateData.firstName = validatedData.firstName;
-		if (validatedData.lastName !== undefined)
-			updateData.lastName = validatedData.lastName;
-		if (validatedData.phone !== undefined)
-			updateData.phone = validatedData.phone;
-		if (validatedData.address !== undefined)
-			updateData.address = validatedData.address;
-		if (validatedData.dateOfBirth)
-			updateData.dateOfBirth = new Date(validatedData.dateOfBirth);
-		if (validatedData.procedure)
-			updateData.procedure = validatedData.procedure;
-		if (validatedData.procedureDate)
-			updateData.procedureDate = new Date(validatedData.procedureDate);
-		if (validatedData.riskLevel)
-			updateData.riskLevel = validatedData.riskLevel;
-		if (validatedData.adherenceRate !== undefined)
-			updateData.adherenceRate = validatedData.adherenceRate;
-		if (validatedData.recoveryProgress !== undefined)
-			updateData.recoveryProgress = validatedData.recoveryProgress;
-		if (validatedData.status) updateData.status = validatedData.status;
+		if (firstName !== undefined) updateData.firstName = firstName;
+		if (lastName !== undefined) updateData.lastName = lastName;
+		if (phone !== undefined) updateData.phone = phone;
+		if (address !== undefined) updateData.address = address;
+		if (dateOfBirth) updateData.dateOfBirth = new Date(dateOfBirth);
+		if (procedure) updateData.procedure = procedure;
+		if (procedureDate) updateData.procedureDate = new Date(procedureDate);
+		if (riskLevel) updateData.riskLevel = riskLevel;
+		if (adherenceRate !== undefined)
+			updateData.adherenceRate = adherenceRate;
+		if (recoveryProgress !== undefined)
+			updateData.recoveryProgress = recoveryProgress;
+		if (status) updateData.status = status;
 
 		const updatedPatient = await Patient.findByIdAndUpdate(
 			patientId,

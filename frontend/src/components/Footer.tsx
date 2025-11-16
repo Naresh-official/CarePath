@@ -79,7 +79,7 @@ function Footer() {
 									href="#roles"
 									className="text-sm hover:text-white transition-colors"
 								>
-									For Clinicians
+									For Doctors
 								</a>
 							</li>
 							<li>

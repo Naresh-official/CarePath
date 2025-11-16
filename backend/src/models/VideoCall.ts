@@ -2,7 +2,7 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 
 export interface IVideoCall extends Document {
 	patientId: mongoose.Types.ObjectId;
-	clinicianId: mongoose.Types.ObjectId;
+	DoctorId: mongoose.Types.ObjectId;
 	startTime: Date;
 	endTime?: Date;
 	duration?: number;
@@ -20,9 +20,9 @@ const videoCallSchema = new Schema<IVideoCall>(
 			ref: "Patient",
 			required: true,
 		},
-		clinicianId: {
+		DoctorId: {
 			type: Schema.Types.ObjectId,
-			ref: "Clinician",
+			ref: "Doctor",
 			required: true,
 		},
 		startTime: {
@@ -37,7 +37,13 @@ const videoCallSchema = new Schema<IVideoCall>(
 		},
 		status: {
 			type: String,
-			enum: ["scheduled", "ringing", "connected", "completed", "cancelled"],
+			enum: [
+				"scheduled",
+				"ringing",
+				"connected",
+				"completed",
+				"cancelled",
+			],
 			default: "scheduled",
 		},
 		callType: {
@@ -54,7 +60,7 @@ const videoCallSchema = new Schema<IVideoCall>(
 );
 
 videoCallSchema.index({ patientId: 1, startTime: -1 });
-videoCallSchema.index({ clinicianId: 1, startTime: -1 });
+videoCallSchema.index({ DoctorId: 1, startTime: -1 });
 
 const VideoCall: Model<IVideoCall> = mongoose.model<IVideoCall>(
 	"VideoCall",

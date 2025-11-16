@@ -4,6 +4,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/apiError.js";
 import Doctor from "../models/Doctor.js";
 import Patient from "../models/Patient.js";
+import Alert from "../models/Alert.js";
 
 export const assignPatientToDoctor = asyncHandler(
 	async (req: Request, res: Response) => {
@@ -30,9 +31,37 @@ export const assignPatientToDoctor = asyncHandler(
 			assignedDate: assignedDate || Date.now(),
 		});
 
-		// TODO : send email to doctor that a new patient has been assigned to them.
-
 		await assignment.save();
+
+		// Fetch patient and doctor details for alert message
+		const [patient, doctor] = await Promise.all([
+			Patient.findById(patientId).populate(
+				"userId",
+				"firstName lastName"
+			),
+			Doctor.findById(doctorId).populate("userId", "firstName lastName"),
+		]);
+
+		// Create alert for the doctor about new patient assignment
+		if (patient && doctor) {
+			const patientName =
+				`${(patient.userId as any)?.firstName || ""} ${
+					(patient.userId as any)?.lastName || ""
+				}`.trim() || "New Patient";
+
+			await Alert.create({
+				patientId,
+				type: "Other",
+				severity: "normal",
+				message: `New patient "${patientName}" has been assigned to you`,
+				status: "active",
+				source: {
+					type: "system",
+					referenceId: assignment._id.toString(),
+				},
+				assignedTo: doctorId,
+			});
+		}
 
 		return res.sendResponse({
 			statusCode: 201,

@@ -36,7 +36,13 @@ const articleSchema = new Schema<IArticle>(
 		category: {
 			type: String,
 			required: true,
-			enum: ["Recovery", "Medications", "Safety", "Wellness", "Nutrition"],
+			enum: [
+				"Recovery",
+				"Medications",
+				"Safety",
+				"Wellness",
+				"Nutrition",
+			],
 		},
 		duration: {
 			type: String,
@@ -44,7 +50,7 @@ const articleSchema = new Schema<IArticle>(
 		},
 		author: {
 			type: Schema.Types.ObjectId,
-			ref: "Clinician",
+			ref: "Doctor",
 		},
 		tags: [String],
 		imageUrl: {

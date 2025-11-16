@@ -15,7 +15,7 @@ const PatientIcon = () => (
 	</svg>
 );
 
-const ClinicianIcon = () => (
+const DoctorIcon = () => (
 	<svg
 		className="h-6 w-6"
 		xmlns="http://www.w3.org/2000/svg"
@@ -80,15 +80,15 @@ function Roles() {
 							on-demand health reports.
 						</p>
 					</div>
-					{/* Role 2: Clinicians */}
+					{/* Role 2: Doctors */}
 					<div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-200">
 						<div className="shrink-0">
 							<span className="inline-flex items-center justify-center h-12 w-12 rounded-lg bg-green-100 text-green-600">
-								<ClinicianIcon />
+								<DoctorIcon />
 							</span>
 						</div>
 						<h3 className="mt-5 text-2xl font-bold text-gray-900">
-							For Clinicians
+							For Doctors
 						</h3>
 						<p className="mt-3 text-base text-gray-600">
 							A powerful dashboard to monitor all patients, triage
@@ -107,7 +107,7 @@ function Roles() {
 							For Administrators
 						</h3>
 						<p className="mt-3 text-base text-gray-600">
-							Full control to manage users, verify clinicians,
+							Full control to manage users, verify Doctors,
 							configure care pathways, set alert thresholds, and
 							monitor compliance.
 						</p>

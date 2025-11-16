@@ -10,7 +10,7 @@ export interface IMessage extends Document {
 	conversationId: string;
 	senderId: mongoose.Types.ObjectId;
 	receiverId: mongoose.Types.ObjectId;
-	senderType: "patient" | "clinician";
+	senderType: "patient" | "Doctor";
 	text: string;
 	status: "sent" | "delivered" | "read";
 	readAt?: Date;
@@ -39,7 +39,7 @@ const messageSchema = new Schema<IMessage>(
 		},
 		senderType: {
 			type: String,
-			enum: ["patient", "clinician"],
+			enum: ["patient", "Doctor"],
 			required: true,
 		},
 		text: {

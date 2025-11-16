@@ -2,12 +2,17 @@ interface TaskItemProps {
 	completed: boolean;
 	title: string;
 	time: string;
+	onToggle?: () => void;
 }
 
-function TaskItem({ completed, title, time }: TaskItemProps) {
-	// TODO : make the completed no reversible once checked
+function TaskItem({ completed, title, time, onToggle }: TaskItemProps) {
 	return (
-		<div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border hover:border-primary/50 transition-colors">
+		<div
+			className={`flex items-center gap-3 p-3 bg-card rounded-lg border border-border hover:border-primary/50 transition-colors ${
+				onToggle ? "cursor-pointer" : ""
+			}`}
+			onClick={onToggle}
+		>
 			<div
 				className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
 					completed ? "bg-primary border-primary" : "border-border"

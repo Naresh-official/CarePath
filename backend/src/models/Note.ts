@@ -36,7 +36,7 @@ const noteSchema = new Schema<INote>(
 		},
 		authorId: {
 			type: Schema.Types.ObjectId,
-			ref: "Clinician",
+			ref: "Doctor",
 			required: true,
 		},
 		type: {

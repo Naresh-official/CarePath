@@ -76,7 +76,7 @@ const symptomCheckInSchema = new Schema<ISymptomCheckIn>(
 		},
 		reviewedBy: {
 			type: Schema.Types.ObjectId,
-			ref: "Clinician",
+			ref: "Doctor",
 		},
 		reviewedAt: {
 			type: Date,

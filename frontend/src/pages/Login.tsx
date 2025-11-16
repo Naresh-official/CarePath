@@ -11,12 +11,11 @@ import {
 	SelectContent,
 	SelectItem,
 } from "@/components/ui/select";
-import { loginSchema } from "@schemas/auth.schema";
 import { toast } from "sonner";
-import { z } from "zod";
-import axios, { isAxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/context/AuthContext";
+import { authApi } from "@/lib/api";
 
 function Login() {
 	const [email, setEmail] = useState("");
@@ -30,58 +29,59 @@ function Login() {
 	const { user, loading: authLoading, refetchUser } = useAuth();
 
 	useEffect(() => {
-		if (user && !authLoading) {
-			if (user.role === "patient") {
-				navigate("/patient/home");
-			} else if (user.role === "doctor") {
-				navigate("/doctor/dashboard");
-			} else if (user.role === "admin") {
-				navigate("/admin/user-management");
+		if (authLoading) return; // Wait for auth context to load
+
+		// Only redirect if user is logged in
+		if (user) {
+			const userRole = user.role.toLowerCase();
+
+			if (userRole === "patient") {
+				navigate("/patient/home", { replace: true });
+			} else if (userRole === "doctor") {
+				navigate("/doctor/dashboard", { replace: true });
+			} else if (userRole === "admin") {
+				navigate("/admin/user-management", { replace: true });
 			}
 		}
-	}, [user, navigate, authLoading]);
+		// If no user, stay on login page (don't redirect)
+	}, [authLoading, user, navigate]);
 
 	const handleSubmit = async (ev: React.FormEvent) => {
 		ev.preventDefault();
 
+		// Simple validation
 		if (!email || !password) {
 			toast.error("Please fill in all fields");
 			return;
 		}
 
-		const result = loginSchema.safeParse({ email, password, role });
-		if (!result.success) {
-			const firstError = z.flattenError(result.error).fieldErrors;
-			toast.error(
-				firstError.email?.[0] ||
-					firstError.password?.[0] ||
-					firstError.role?.[0] ||
-					"Invalid input"
-			);
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			toast.error("Please enter a valid email address");
+			return;
+		}
+
+		if (password.length < 6) {
+			toast.error("Password must be at least 6 characters");
 			return;
 		}
 
 		try {
 			setLoading(true);
 
-			const { data } = await axios.post(
-				`${import.meta.env.VITE_BACKEND_URL}/auth/login`,
-				result.data,
-				{ withCredentials: true }
-			);
+			const { data } = await authApi.login({ email, password, role });
 
 			if (data.success) {
-				// Refetch user to update context
 				await refetchUser();
 
 				toast.success("Login successful!");
 
 				// Navigate based on role
-				if (data.data.role === "patient") {
+				const userRole = data.data.role.toLowerCase();
+				if (userRole === "patient") {
 					navigate("/patient/home", { replace: true });
-				} else if (data.data.role === "doctor") {
+				} else if (userRole === "doctor") {
 					navigate("/doctor/dashboard", { replace: true });
-				} else if (data.data.role === "admin") {
+				} else if (userRole === "admin") {
 					navigate("/admin/user-management", { replace: true });
 				}
 			}
@@ -90,7 +90,7 @@ function Login() {
 				if (
 					err.response &&
 					err.response.data &&
-					err.response.data.error
+					err.response.data.message
 				) {
 					toast.error(err.response.data.message);
 					return;

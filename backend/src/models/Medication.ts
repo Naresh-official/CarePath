@@ -1,15 +1,20 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
 
-export interface IMedicationSchedule {
-	time?: string;
+export interface IMedicationTiming {
+	timeOfDay: "morning" | "afternoon" | "night";
+}
+
+export interface IDoseTaken {
+	date: Date;
+	timeOfDay: "morning" | "afternoon" | "night";
+	takenAt: Date;
 }
 
 export interface IMedication extends Document {
 	patientId: mongoose.Types.ObjectId;
 	name: string;
-	dosage: string;
-	frequency: string;
-	schedule?: IMedicationSchedule[];
+	timings: IMedicationTiming[];
+	foodRelation: "before" | "after" | "with" | "empty_stomach";
 	startDate: Date;
 	endDate?: Date;
 	duration?: string;
@@ -18,6 +23,7 @@ export interface IMedication extends Document {
 	adherenceRate: number;
 	isActive: boolean;
 	prescribedBy?: mongoose.Types.ObjectId;
+	dosesTaken: IDoseTaken[];
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -34,19 +40,21 @@ const medicationSchema = new Schema<IMedication>(
 			required: true,
 			trim: true,
 		},
-		dosage: {
-			type: String,
-			required: true,
-		},
-		frequency: {
-			type: String,
-			required: true,
-		},
-		schedule: [
+		timings: [
 			{
-				time: String,
+				timeOfDay: {
+					type: String,
+					enum: ["morning", "afternoon", "night"],
+					required: true,
+				},
 			},
 		],
+		foodRelation: {
+			type: String,
+			enum: ["before", "after", "with", "empty_stomach"],
+			required: true,
+			default: "after",
+		},
 		startDate: {
 			type: Date,
 			required: true,
@@ -73,8 +81,25 @@ const medicationSchema = new Schema<IMedication>(
 		},
 		prescribedBy: {
 			type: Schema.Types.ObjectId,
-			ref: "Clinician",
+			ref: "Doctor",
 		},
+		dosesTaken: [
+			{
+				date: {
+					type: Date,
+					required: true,
+				},
+				timeOfDay: {
+					type: String,
+					enum: ["morning", "afternoon", "night"],
+					required: true,
+				},
+				takenAt: {
+					type: Date,
+					default: Date.now,
+				},
+			},
+		],
 	},
 	{ timestamps: true }
 );

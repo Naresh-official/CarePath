@@ -22,11 +22,17 @@ export interface IAlert extends Document {
 	message: string;
 	status: "active" | "resolved" | "dismissed";
 	triggeredBy?: {
-		source?: "symptom-checkin" | "medication" | "task" | "manual" | "system";
+		source?:
+			| "symptom-checkin"
+			| "medication"
+			| "task"
+			| "manual"
+			| "system";
 		referenceId?: mongoose.Types.ObjectId;
 	};
 	assignedTo?: mongoose.Types.ObjectId;
 	actions?: IAlertAction[];
+	viewedBy?: mongoose.Types.ObjectId[];
 	resolvedBy?: mongoose.Types.ObjectId;
 	resolvedAt?: Date;
 	createdAt: Date;
@@ -72,7 +78,13 @@ const alertSchema = new Schema<IAlert>(
 		triggeredBy: {
 			source: {
 				type: String,
-				enum: ["symptom-checkin", "medication", "task", "manual", "system"],
+				enum: [
+					"symptom-checkin",
+					"medication",
+					"task",
+					"manual",
+					"system",
+				],
 			},
 			referenceId: {
 				type: Schema.Types.ObjectId,
@@ -80,22 +92,28 @@ const alertSchema = new Schema<IAlert>(
 		},
 		assignedTo: {
 			type: Schema.Types.ObjectId,
-			ref: "Clinician",
+			ref: "Doctor",
 		},
 		actions: [
 			{
 				action: String,
 				performedBy: {
 					type: Schema.Types.ObjectId,
-					ref: "Clinician",
+					ref: "Doctor",
 				},
 				performedAt: Date,
 				notes: String,
 			},
 		],
+		viewedBy: [
+			{
+				type: Schema.Types.ObjectId,
+				ref: "User",
+			},
+		],
 		resolvedBy: {
 			type: Schema.Types.ObjectId,
-			ref: "Clinician",
+			ref: "Doctor",
 		},
 		resolvedAt: {
 			type: Date,

@@ -163,7 +163,9 @@ export const deleteDoctor = asyncHandler(
 
 		const deletedDoctor = await Doctor.findByIdAndDelete(doctorId);
 
-		if (!deletedDoctor) {
+		const deletedUser = await User.findByIdAndDelete(deletedDoctor?.userId);
+
+		if (!deletedDoctor || !deletedUser) {
 			throw new ApiError("Doctor not found", 404);
 		}
 

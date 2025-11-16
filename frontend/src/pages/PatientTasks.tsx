@@ -1,33 +1,146 @@
+import { useEffect, useState } from "react";
 import TaskItem from "@/components/TaskItem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { patientApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import type { Task, Medication } from "@/lib/types";
+import { toast } from "sonner";
 
 function PatientTasks() {
-	const tasks = [
-		{
-			date: "Today",
-			items: [
-				{
-					completed: true,
-					title: "Morning Medication",
-					time: "8:00 AM",
-				},
-				{ completed: true, title: "Wound Check", time: "10:00 AM" },
-				{
-					completed: false,
-					title: "Physical Therapy",
-					time: "2:00 PM",
-				},
-			],
-		},
-		{
-			date: "Tomorrow",
-			items: [
-				{ completed: false, title: "Follow-up Call", time: "10:00 AM" },
-				{ completed: false, title: "Lab Work", time: "1:00 PM" },
-			],
-		},
-	];
+	const { user, loading: authLoading } = useAuth();
+	const [tasks, setTasks] = useState<Task[]>([]);
+	const [medications, setMedications] = useState<Medication[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [patientId, setPatientId] = useState<string | null>(null);
+
+	useEffect(() => {
+		const fetchData = async () => {
+			if (authLoading || !user) return;
+
+			try {
+				setLoading(true);
+
+				const analyticsRes = await patientApi.getAnalytics();
+
+				console.log(analyticsRes);
+
+				const fetchedPatientId = analyticsRes.data.data?.patient?._id;
+
+				console.log(fetchedPatientId);
+
+				if (!fetchedPatientId) {
+					throw new Error("Could not find patient profile");
+				}
+
+				setPatientId(fetchedPatientId);
+
+				const tasksRes = await patientApi.getTasks(fetchedPatientId);
+				const allTasks = tasksRes.data.data || [];
+				setTasks(
+					allTasks.filter((task: Task) => task.type !== "medication")
+				);
+
+				const medsRes = await patientApi.getMyMedications();
+				setMedications(medsRes.data.data || []);
+			} catch (error) {
+				console.error("Error fetching data:", error);
+				const err = error as {
+					response?: { data?: { message?: string } };
+				};
+				toast.error(
+					err.response?.data?.message ||
+						"Failed to load tasks and medications"
+				);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchData();
+	}, [user, authLoading]);
+
+	const handleTaskToggle = async (taskId: string, completed: boolean) => {
+		if (!patientId) return;
+
+		try {
+			await patientApi.updateTask(taskId, { completed });
+			setTasks((prev) =>
+				prev.map((task) =>
+					task._id === taskId ? { ...task, completed } : task
+				)
+			);
+			toast.success(
+				completed ? "Task completed!" : "Task marked as incomplete"
+			);
+		} catch (error: unknown) {
+			console.error("Error updating task:", error);
+			toast.error("Failed to update task");
+		}
+	};
+
+	const handleDoseTaken = async (medicationId: string, timeOfDay: string) => {
+		try {
+			await patientApi.markDoseAsTaken(medicationId, timeOfDay);
+
+			// Refresh medications to update UI
+			const medsRes = await patientApi.getMyMedications();
+			setMedications(medsRes.data.data || []);
+
+			toast.success(
+				`${
+					timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)
+				} dose marked as taken`
+			);
+		} catch (error: unknown) {
+			console.error("Error marking dose:", error);
+			const err = error as { response?: { data?: { message?: string } } };
+			toast.error(
+				err.response?.data?.message || "Failed to mark dose as taken"
+			);
+		}
+	};
+
+	// Group tasks by date
+	const groupTasksByDate = () => {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		const tomorrow = new Date(today);
+		tomorrow.setDate(tomorrow.getDate() + 1);
+
+		const groups: { date: string; items: Task[] }[] = [];
+		const todayTasks = tasks.filter((task) => {
+			const taskDate = new Date(task.scheduledTime);
+			taskDate.setHours(0, 0, 0, 0);
+			return taskDate.getTime() === today.getTime();
+		});
+
+		const tomorrowTasks = tasks.filter((task) => {
+			const taskDate = new Date(task.scheduledTime);
+			taskDate.setHours(0, 0, 0, 0);
+			return taskDate.getTime() === tomorrow.getTime();
+		});
+
+		if (todayTasks.length > 0)
+			groups.push({ date: "Today", items: todayTasks });
+		if (tomorrowTasks.length > 0)
+			groups.push({ date: "Tomorrow", items: tomorrowTasks });
+
+		return groups;
+	};
+
+	if (loading) {
+		return (
+			<div className="w-full p-4 md:p-6">
+				<h1 className="text-3xl font-semibold text-foreground">
+					Loading...
+				</h1>
+			</div>
+		);
+	}
+
+	const taskGroups = groupTasksByDate();
 
 	return (
 		<div className="w-full p-4 md:p-6 gap-4 flex h-[calc(100vh-5rem)] overflow-hidden">
@@ -36,18 +149,42 @@ function PatientTasks() {
 					My Tasks
 				</h1>
 
-				{tasks.map((group) => (
-					<div key={group.date} className="space-y-3">
-						<h2 className="font-semibold text-lg text-primary">
-							{group.date}
-						</h2>
-						<div className="space-y-2">
-							{group.items.map((task, idx) => (
-								<TaskItem key={idx} {...task} />
-							))}
+				{taskGroups.length === 0 ? (
+					<Card className="p-6 text-center mt-4">
+						<p className="text-muted-foreground">
+							No tasks scheduled
+						</p>
+					</Card>
+				) : (
+					taskGroups.map((group) => (
+						<div key={group.date} className="space-y-3">
+							<h2 className="font-semibold text-lg text-primary">
+								{group.date}
+							</h2>
+							<div className="space-y-2">
+								{group.items.map((task) => (
+									<TaskItem
+										key={task._id}
+										completed={task.completed}
+										title={task.title}
+										time={new Date(
+											task.scheduledTime
+										).toLocaleTimeString([], {
+											hour: "2-digit",
+											minute: "2-digit",
+										})}
+										onToggle={() =>
+											handleTaskToggle(
+												task._id,
+												!task.completed
+											)
+										}
+									/>
+								))}
+							</div>
 						</div>
-					</div>
-				))}
+					))
+				)}
 			</div>
 
 			{/* TODO : sent sms / email reminder */}
@@ -59,27 +196,23 @@ function PatientTasks() {
 					<p className="text-sm text-muted-foreground">
 						Your current prescriptions and schedules
 					</p>
-					<Card className="p-4 space-y-3">
-						{/* Remove Item once taken */}
-						<MedicationItem
-							name="Ibuprofen 400mg"
-							schedule="Every 6 hours"
-							dosage="1 tablet"
-							nextDue="2:00 PM"
-						/>
-						<MedicationItem
-							name="Amoxicillin 500mg"
-							schedule="Twice daily"
-							dosage="1 capsule"
-							nextDue="6:00 PM"
-						/>
-						<MedicationItem
-							name="Vitamin C 1000mg"
-							schedule="Once daily"
-							dosage="1 tablet"
-							nextDue="Tomorrow 8:00 AM"
-						/>
-					</Card>
+					{medications.length === 0 ? (
+						<Card className="p-6 text-center">
+							<p className="text-muted-foreground">
+								No active medications
+							</p>
+						</Card>
+					) : (
+						<Card className="p-4 space-y-3">
+							{medications.map((med) => (
+								<MedicationItem
+									key={med._id}
+									medication={med}
+									onDoseTaken={handleDoseTaken}
+								/>
+							))}
+						</Card>
+					)}
 				</div>
 				<div className="space-y-3 mt-8">
 					<h2 className="font-semibold text-3xl text-foreground">
@@ -112,31 +245,107 @@ function PatientTasks() {
 	);
 }
 
-// Add explicit interfaces for props and replace `any` usages
+// Medication Item Component
 interface MedicationItemProps {
-	name: string;
-	schedule: string;
-	dosage: string;
-	nextDue: string;
+	medication: Medication;
+	onDoseTaken: (medicationId: string, timeOfDay: string) => void;
 }
 
-function MedicationItem({
-	name,
-	schedule,
-	dosage,
-	nextDue,
-}: MedicationItemProps) {
+function MedicationItem({ medication, onDoseTaken }: MedicationItemProps) {
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+
+	// Check which doses have been taken today
+	const getDoseStatus = (timeOfDay: string) => {
+		return medication.dosesTaken.some((dose) => {
+			const doseDate = new Date(dose.date);
+			doseDate.setHours(0, 0, 0, 0);
+			return (
+				doseDate.getTime() === today.getTime() &&
+				dose.timeOfDay === timeOfDay
+			);
+		});
+	};
+
+	const foodRelationText = {
+		before: "before food",
+		after: "after food",
+		with: "with food",
+		empty_stomach: "on empty stomach",
+	};
+
+	// Get scheduled hour for each time of day
+	const getScheduledHour = (timeOfDay: string): number => {
+		const timeMap = {
+			morning: 8,
+			afternoon: 14,
+			night: 20,
+		};
+		return timeMap[timeOfDay as keyof typeof timeMap];
+	};
+
+	// Check if current time has passed the scheduled time for a dose
+	const isDoseTimeReached = (timeOfDay: string): boolean => {
+		const now = new Date();
+		const scheduledHour = getScheduledHour(timeOfDay);
+		return now.getHours() >= scheduledHour;
+	};
+
+	// Get next untaken dose that is due now
+	const getNextAvailableDose = () => {
+		for (const timing of medication.timings) {
+			const isTaken = getDoseStatus(timing.timeOfDay);
+			const isTimeReached = isDoseTimeReached(timing.timeOfDay);
+
+			if (!isTaken && isTimeReached) {
+				return timing.timeOfDay;
+			}
+		}
+		return null;
+	};
+
+	// Get next untaken dose for display
+	const getNextDose = () => {
+		for (const timing of medication.timings) {
+			if (!getDoseStatus(timing.timeOfDay)) {
+				const timeMap = {
+					morning: "08:00 AM",
+					afternoon: "02:00 PM",
+					night: "08:00 PM",
+				};
+				return `${timing.timeOfDay} - ${timeMap[timing.timeOfDay]}`;
+			}
+		}
+		return "All doses taken today";
+	};
+
+	const nextAvailableDose = getNextAvailableDose();
+	const isButtonDisabled = nextAvailableDose === null;
+
 	return (
 		<div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
 			<div className="flex-1">
-				<p className="font-medium text-foreground">{name}</p>
-				<p className="text-sm text-muted-foreground">{schedule}</p>
+				<p className="font-medium text-foreground">{medication.name}</p>
+				<p className="text-sm text-muted-foreground">
+					{medication.timings.length}{" "}
+					{medication.timings.length === 1 ? "time" : "times"} daily •{" "}
+					{foodRelationText[medication.foodRelation]}
+				</p>
 				<p className="text-xs text-muted-foreground mt-1">
-					Dosage: {dosage} | Next due: {nextDue}
+					Next due: {getNextDose()}
 				</p>
 			</div>
-			<Button size="sm" variant="outline">
-				Taken
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={isButtonDisabled}
+				onClick={() => {
+					if (nextAvailableDose) {
+						onDoseTaken(medication._id, nextAvailableDose);
+					}
+				}}
+			>
+				{isButtonDisabled ? "Not Yet Due" : "Taken"}
 			</Button>
 		</div>
 	);

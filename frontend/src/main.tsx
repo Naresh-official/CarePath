@@ -58,7 +58,10 @@ const router = createBrowserRouter([
 				element: <DoctorLayout />,
 				children: [
 					{ path: "dashboard", element: <DoctorDashboard /> },
-					{ path: "patient-profile", element: <PatientProfile /> },
+					{
+						path: "patient-profile/:patientId",
+						element: <PatientProfile />,
+					},
 					{ path: "alerts", element: <Alerts /> },
 					{ path: "analytics", element: <Analytics /> },
 				],

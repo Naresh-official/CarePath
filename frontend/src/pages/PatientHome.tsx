@@ -1,24 +1,117 @@
+import { useEffect, useState } from "react";
 import TaskItem from "@/components/TaskItem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router";
+import { patientApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import type { Task } from "@/lib/types";
+import { toast } from "sonner";
 
 function PatientHome() {
-	const completedToday = 3;
-	const totalTasks = 7;
-	const progressPercent = (completedToday / totalTasks) * 100;
-
 	const navigate = useNavigate();
+	const { user } = useAuth();
+	const [tasks, setTasks] = useState<Task[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [patientId, setPatientId] = useState<string | null>(null);
+	const [userName, setUserName] = useState("Patient");
+	const [daysPostOp, setDaysPostOp] = useState(0);
+
+	useEffect(() => {
+		const fetchData = async () => {
+			if (!user?._id) return;
+
+			try {
+				setLoading(true);
+
+				// Get patient details from analytics
+				const analyticsRes = await patientApi.getAnalytics();
+				const patient = analyticsRes.data.data?.patient;
+
+				if (!patient?._id) {
+					throw new Error("Could not find patient profile");
+				}
+
+				setPatientId(patient._id);
+				setUserName(user.name?.split(" ")[0] || "Patient");
+				setDaysPostOp(patient.daysPostOp || 0);
+
+				// Fetch today's tasks (excluding medication type)
+				const tasksRes = await patientApi.getTasks(patient._id);
+				const allTasks = tasksRes.data.data || [];
+
+				// Filter for today's tasks and exclude medication type
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+
+				const todayTasks = allTasks.filter((task: Task) => {
+					const taskDate = new Date(task.scheduledTime);
+					taskDate.setHours(0, 0, 0, 0);
+					return (
+						taskDate.getTime() === today.getTime() &&
+						task.type !== "medication"
+					);
+				});
+
+				setTasks(todayTasks);
+			} catch (error: unknown) {
+				console.error("Error fetching data:", error);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchData();
+	}, [user]);
+
+	const handleTaskToggle = async (taskId: string, completed: boolean) => {
+		try {
+			await patientApi.updateTask(taskId, { completed });
+			setTasks((prev) =>
+				prev.map((task) =>
+					task._id === taskId ? { ...task, completed } : task
+				)
+			);
+			toast.success(
+				completed ? "Task completed!" : "Task marked as incomplete"
+			);
+		} catch (error: unknown) {
+			console.error("Error updating task:", error);
+			toast.error("Failed to update task");
+		}
+	};
+
+	const completedToday = tasks.filter((t) => t.completed).length;
+	const totalTasks = tasks.length;
+	const progressPercent =
+		totalTasks > 0 ? (completedToday / totalTasks) * 100 : 0;
+
+	const getGreeting = () => {
+		const hour = new Date().getHours();
+		if (hour < 12) return "Good Morning";
+		if (hour < 18) return "Good Afternoon";
+		return "Good Evening";
+	};
+
+	if (loading) {
+		return (
+			<div className="max-w-2xl mx-auto p-4 md:p-6">
+				<h1 className="text-3xl font-bold text-foreground">
+					Loading...
+				</h1>
+			</div>
+		);
+	}
 
 	return (
 		<div className="max-w-2xl mx-auto p-4 md:p-6 space-y-6">
 			{/* Header */}
 			<div className="space-y-2">
 				<h1 className="text-3xl font-bold text-foreground">
-					Good Morning, Sarah
+					{getGreeting()}, {userName}
 				</h1>
 				<p className="text-muted-foreground">
-					Day 5 Post-Op - You're doing great!
+					Day {daysPostOp} Post-Op - You're doing great!
 				</p>
 			</div>
 
@@ -40,7 +133,9 @@ function PatientHome() {
 						/>
 					</div>
 					<p className="text-sm text-muted-foreground">
-						You're on track for a smooth recovery
+						{totalTasks === 0
+							? "No tasks for today"
+							: "You're on track for a smooth recovery"}
 					</p>
 				</div>
 			</Card>
@@ -80,29 +175,32 @@ function PatientHome() {
 				<h2 className="font-semibold text-lg text-foreground">
 					Today's Tasks
 				</h2>
-				<div className="space-y-2">
-					<TaskItem
-						completed
-						title="Morning Medication"
-						time="8:00 AM"
-					/>
-					<TaskItem completed title="Wound Check" time="10:00 AM" />
-					<TaskItem
-						completed
-						title="Physical Therapy"
-						time="2:00 PM"
-					/>
-					<TaskItem
-						completed={false}
-						title="Evening Medication"
-						time="8:00 PM"
-					/>
-					<TaskItem
-						completed={false}
-						title="Pain Assessment"
-						time="9:00 PM"
-					/>
-				</div>
+				{tasks.length === 0 ? (
+					<Card className="p-6 text-center">
+						<p className="text-muted-foreground">
+							No tasks for today
+						</p>
+					</Card>
+				) : (
+					<div className="space-y-2">
+						{tasks.slice(0, 5).map((task) => (
+							<TaskItem
+								key={task._id}
+								completed={task.completed}
+								title={task.title}
+								time={new Date(
+									task.scheduledTime
+								).toLocaleTimeString([], {
+									hour: "2-digit",
+									minute: "2-digit",
+								})}
+								onToggle={() =>
+									handleTaskToggle(task._id, !task.completed)
+								}
+							/>
+						))}
+					</div>
+				)}
 			</div>
 		</div>
 	);

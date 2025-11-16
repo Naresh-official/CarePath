@@ -88,13 +88,13 @@ function PlatformFeatures() {
 				{/* Feature 2: Clinical Monitoring */}
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-20">
 					<img
-						src="https://placehold.co/600x450/e0f2fe/0284c7?text=Clinician+Triage+Dashboard"
-						alt="Clinician Dashboard"
+						src="https://placehold.co/600x450/e0f2fe/0284c7?text=Doctor+Triage+Dashboard"
+						alt="Doctor Dashboard"
 						className="rounded-xl shadow-2xl md:order-last"
 						onError={(e) => {
 							e.target.onerror = null;
 							e.target.src =
-								"https://placehold.co/600x450/e0f2fe/333333?text=Clinician+View";
+								"https://placehold.co/600x450/e0f2fe/333333?text=Doctor+View";
 						}}
 					/>
 					<div>
@@ -222,9 +222,8 @@ function PlatformFeatures() {
 									<CheckIcon />
 								</div>
 								<span className="text-gray-700">
-									<b>Clinician & Patient Management</b> with
-									bulk assignment, and credential
-									verification.
+									<b>Doctor & Patient Management</b> with bulk
+									assignment, and credential verification.
 								</span>
 							</li>
 							<li className="flex items-start">

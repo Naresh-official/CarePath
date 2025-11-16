@@ -15,6 +15,7 @@ export interface ITask extends Document {
 	completed: boolean;
 	completedAt?: Date;
 	priority: "low" | "medium" | "high";
+	medicationId?: mongoose.Types.ObjectId;
 	recurring?: {
 		enabled?: boolean;
 		frequency?: "daily" | "weekly" | "monthly";
@@ -67,6 +68,10 @@ const taskSchema = new Schema<ITask>(
 			type: String,
 			enum: ["low", "medium", "high"],
 			default: "medium",
+		},
+		medicationId: {
+			type: Schema.Types.ObjectId,
+			ref: "Medication",
 		},
 		recurring: {
 			enabled: {

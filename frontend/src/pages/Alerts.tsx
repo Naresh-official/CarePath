@@ -1,152 +1,164 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/formatDate";
+import { alertApi } from "@/lib/api";
+import type { Alert as AlertType } from "@/lib/types";
 
 function Alerts() {
-	const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
+	const navigate = useNavigate();
+	const [filterStatus, setFilterStatus] = useState<string | null>(null);
+	const [alerts, setAlerts] = useState<AlertType[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
-	const allAlerts = [
-		{
-			id: 1,
-			patient: "Emma Davis",
-			severity: "critical",
-			type: "High Fever",
-			message: "Temperature 101.2°F detected",
-			time: "1 hour ago",
-			status: "active",
-			actions: ["Contact Patient", "Schedule Call", "Escalate"],
-		},
-		{
-			id: 2,
-			patient: "Michael Chen",
-			severity: "warning",
-			type: "Missed Medication",
-			message: "Patient missed evening medication reminder",
-			time: "3 hours ago",
-			status: "active",
-			actions: ["Send Reminder", "Contact Patient"],
-		},
-		{
-			id: 3,
-			patient: "Lisa Anderson",
-			severity: "warning",
-			type: "Low Adherence",
-			message: "Medication adherence dropped to 65%",
-			time: "5 hours ago",
-			status: "active",
-			actions: ["Review Plan", "Contact Patient"],
-		},
-		{
-			id: 4,
-			patient: "James Wilson",
-			severity: "normal",
-			type: "Check-in Completed",
-			message: "Patient completed daily symptom check-in",
-			time: "2 hours ago",
-			status: "resolved",
-			actions: ["View Details"],
-		},
-	];
+	// Fetch alerts on component mount
+	useEffect(() => {
+		fetchAlerts();
+	}, []);
 
-	let filteredAlerts = allAlerts;
-	if (filterSeverity) {
+	const fetchAlerts = async () => {
+		try {
+			setLoading(true);
+			setError(null);
+			// Fetch alerts without including viewed ones (they'll be filtered by backend)
+			const response = await alertApi.getAllAlerts({
+				includeViewed: "false",
+			});
+			setAlerts(response.data.data.alerts || []);
+		} catch (err: any) {
+			console.error("Error fetching alerts:", err);
+			setError(err.response?.data?.message || "Failed to load alerts");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const markAsViewed = async (alertId: string) => {
+		try {
+			// Mark the alert as viewed
+			await alertApi.markAsViewed(alertId);
+			// Remove the alert from the UI immediately (notification behavior)
+			setAlerts((prevAlerts) =>
+				prevAlerts.filter((a) => a._id !== alertId)
+			);
+		} catch (err: any) {
+			console.error("Error marking alert as viewed:", err);
+		}
+	};
+
+	const resolveAlert = async (alertId: string) => {
+		try {
+			await alertApi.updateAlertStatus(alertId, { status: "resolved" });
+			// Refresh alerts
+			fetchAlerts();
+		} catch (err: any) {
+			console.error("Error resolving alert:", err);
+		}
+	};
+
+	const handleViewPatient = (patientId: string) => {
+		// Navigate to patient profile with patient ID
+		navigate(`/doctor/patient-profile/${patientId}`);
+	};
+
+	let filteredAlerts = alerts;
+	if (filterStatus) {
 		filteredAlerts = filteredAlerts.filter(
-			(a) => a.severity === filterSeverity
+			(a) => a.status === filterStatus
 		);
 	}
 
 	const stats = {
-		critical: allAlerts.filter(
-			(a) => a.severity === "critical" && a.status === "active"
-		).length,
-		warning: allAlerts.filter(
-			(a) => a.severity === "warning" && a.status === "active"
-		).length,
-		normal: allAlerts.filter(
-			(a) => a.severity === "normal" && a.status === "active"
-		).length,
+		active: alerts.filter((a) => a.status === "active").length,
+		dismissed: alerts.filter((a) => a.status === "dismissed").length,
+		resolved: alerts.filter((a) => a.status === "resolved").length,
 	};
 
-	const severityFilters = [
-		{ value: null, label: "All Severity", variant: "default" as const },
+	const statusFilters = [
+		{ value: null, label: "All Alerts", variant: "default" as const },
 		{
-			value: "critical",
-			label: "Critical",
-			variant: "destructive" as const,
-		},
-		{
-			value: "warning",
-			label: "Warning",
+			value: "active",
+			label: "Active",
 			variant: "default" as const,
-			color: "yellow",
+			color: "red",
 		},
 		{
-			value: "normal",
-			label: "Normal",
+			value: "dismissed",
+			label: "Dismissed",
+			variant: "default" as const,
+			color: "blue",
+		},
+		{
+			value: "resolved",
+			label: "Resolved",
 			variant: "default" as const,
 			color: "green",
 		},
 	];
+
+	// Get patient name from alert
+	const getPatientName = (alert: AlertType) => {
+		if (typeof alert.patientId === "object" && alert.patientId?.userId) {
+			const userId = alert.patientId.userId as any;
+			return (
+				`${userId.firstName || ""} ${userId.lastName || ""}`.trim() ||
+				"Patient"
+			);
+		}
+		return "Patient";
+	};
+
+	// Get patient ID string
+	const getPatientId = (alert: AlertType): string => {
+		if (typeof alert.patientId === "object") {
+			return alert.patientId._id;
+		}
+		return alert.patientId;
+	};
 
 	return (
 		<div className="p-4 md:p-6 space-y-6">
 			{/* Header */}
 			<div>
 				<h1 className="text-3xl font-bold text-foreground">
-					Alerts & Interventions
+					Patient Alerts
 				</h1>
 				<p className="text-muted-foreground">
-					Monitor and manage patient alerts
+					Monitor alerts for your assigned patients
 				</p>
-			</div>
-
-			{/* Alert Stats */}
-			<div className="grid grid-cols-3 gap-4">
-				<Card className="p-4 border-l-4 border-l-red-500">
-					<p className="text-sm text-muted-foreground">Critical</p>
-					<p className="text-3xl font-bold text-red-600">
-						{stats.critical}
-					</p>
-				</Card>
-				<Card className="p-4 border-l-4 border-l-yellow-500">
-					<p className="text-sm text-muted-foreground">Warning</p>
-					<p className="text-3xl font-bold text-yellow-600">
-						{stats.warning}
-					</p>
-				</Card>
-				<Card className="p-4 border-l-4 border-l-green-500">
-					<p className="text-sm text-muted-foreground">Normal</p>
-					<p className="text-3xl font-bold text-green-600">
-						{stats.normal}
-					</p>
-				</Card>
 			</div>
 
 			{/* Filters */}
 			<Card className="p-4 space-y-4">
 				<div className="flex flex-col md:flex-row gap-4">
 					<div className="flex gap-2 flex-wrap">
-						{severityFilters.map((filter) => (
+						{statusFilters.map((filter) => (
 							<Button
 								key={filter.label}
 								variant={
-									filterSeverity === filter.value
-										? filter.variant
+									filterStatus === filter.value
+										? "default"
 										: "outline"
 								}
 								size="sm"
-								onClick={() => setFilterSeverity(filter.value)}
+								onClick={() => setFilterStatus(filter.value)}
 								className={
-									filterSeverity === filter.value &&
-									filter.color === "yellow"
-										? "bg-yellow-500 hover:bg-yellow-600 text-white"
-										: filterSeverity === filter.value &&
+									filterStatus === filter.value &&
+									filter.color === "red"
+										? "bg-red-500 hover:bg-red-600 text-white"
+										: filterStatus === filter.value &&
+										  filter.color === "blue"
+										? "bg-blue-500 hover:bg-blue-600 text-white"
+										: filterStatus === filter.value &&
 										  filter.color === "green"
 										? "bg-green-500 hover:bg-green-600 text-white"
-										: filter.color === "yellow"
-										? "hover:bg-yellow-50"
+										: filter.color === "red"
+										? "hover:bg-red-50"
+										: filter.color === "blue"
+										? "hover:bg-blue-50"
 										: filter.color === "green"
 										? "hover:bg-green-50"
 										: ""
@@ -159,72 +171,138 @@ function Alerts() {
 				</div>
 			</Card>
 
-			{/* Alerts List */}
-			<div className="space-y-3">
-				{filteredAlerts.length > 0 ? (
-					filteredAlerts.map((alert) => (
-						<Card
-							key={alert.id}
-							// TODO : Remove alerts filters if resolved is selected
-							className={`p-4 border-l-4 ${
-								alert.severity === "critical"
-									? "border-l-red-500 bg-red-50"
-									: alert.severity === "warning"
-									? "border-l-yellow-500 bg-yellow-50"
-									: "border-l-green-500 bg-green-50"
-							}`}
-						>
-							<div className="space-y-3">
-								<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-									<div className="flex-1">
-										<div className="flex items-center gap-2 mb-2">
-											<p className="font-semibold text-foreground">
-												{alert.patient}
-											</p>
-											<span
-												className={`px-2 py-1 rounded text-xs font-medium ${
-													alert.severity ===
-													"critical"
-														? "bg-red-200 text-red-800"
-														: alert.severity ===
-														  "warning"
-														? "bg-yellow-200 text-yellow-800"
-														: "bg-green-200 text-green-800"
-												}`}
-											>
-												{alert.type}
-											</span>
-										</div>
-										<p className="text-sm text-foreground mb-1">
-											{alert.message}
-										</p>
-										<p className="text-xs text-muted-foreground">
-											{alert.time}
-										</p>
-									</div>
-								</div>
+			{/* Loading/Error States */}
+			{loading && (
+				<div className="text-center py-8">
+					<p className="text-muted-foreground">Loading alerts...</p>
+				</div>
+			)}
 
-								{/* Action Buttons */}
-								<div className="flex flex-wrap gap-2">
-									{alert.actions.map((action, idx) => (
+			{error && (
+				<Card className="p-4 bg-red-50 border-red-200">
+					<p className="text-red-800">{error}</p>
+					<Button
+						size="sm"
+						variant="outline"
+						onClick={fetchAlerts}
+						className="mt-2"
+					>
+						Retry
+					</Button>
+				</Card>
+			)}
+
+			{/* Alerts List */}
+			{!loading && !error && (
+				<div className="space-y-3">
+					{filteredAlerts.length > 0 ? (
+						filteredAlerts.map((alert) => (
+							<Card
+								key={alert._id}
+								className={`p-4 border-l-4 ${
+									alert.status === "active"
+										? "border-l-red-500 bg-red-50"
+										: alert.status === "dismissed"
+										? "border-l-blue-500 bg-blue-50"
+										: "border-l-green-500 bg-green-50"
+								}`}
+							>
+								<div className="space-y-3">
+									<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+										<div className="flex-1">
+											<div className="flex items-center gap-2 mb-2">
+												<p className="font-semibold text-foreground text-lg">
+													{getPatientName(alert)}
+												</p>
+												<Badge
+													variant="outline"
+													className={`${
+														alert.status ===
+														"active"
+															? "bg-red-200 text-red-800"
+															: alert.status ===
+															  "dismissed"
+															? "bg-blue-200 text-blue-800"
+															: "bg-green-200 text-green-800"
+													}`}
+												>
+													{alert.status
+														.charAt(0)
+														.toUpperCase() +
+														alert.status.slice(1)}
+												</Badge>
+												<Badge
+													variant="secondary"
+													className={`${
+														alert.severity ===
+														"critical"
+															? "bg-red-100 text-red-800"
+															: alert.severity ===
+															  "warning"
+															? "bg-yellow-100 text-yellow-800"
+															: "bg-gray-100 text-gray-800"
+													}`}
+												>
+													{alert.severity}
+												</Badge>
+											</div>
+											<p className="text-sm text-foreground mb-1">
+												{alert.message}
+											</p>
+											<p className="text-xs text-muted-foreground">
+												{formatDate(alert.createdAt)}
+											</p>
+										</div>
+									</div>
+
+									{/* Action Buttons */}
+									<div className="flex flex-wrap gap-2">
 										<Button
-											key={idx}
+											size="sm"
+											variant="default"
+											onClick={() => {
+												markAsViewed(alert._id);
+												handleViewPatient(
+													getPatientId(alert)
+												);
+											}}
+										>
+											View Patient Details
+										</Button>
+										<Button
 											size="sm"
 											variant="outline"
+											onClick={() =>
+												markAsViewed(alert._id)
+											}
 										>
-											{action}
+											Dismiss
 										</Button>
-									))}
+										{alert.status === "active" && (
+											<Button
+												size="sm"
+												variant="secondary"
+												onClick={() => {
+													resolveAlert(alert._id);
+													markAsViewed(alert._id);
+												}}
+											>
+												Resolve
+											</Button>
+										)}
+									</div>
 								</div>
-							</div>
-						</Card>
-					))
-				) : (
-					<div className="text-center py-8">
-						<p className="text-muted-foreground">No alerts found</p>
-					</div>
-				)}
-			</div>
+							</Card>
+						))
+					) : (
+						<div className="text-center py-8">
+							<p className="text-muted-foreground">
+								No alerts found
+							</p>
+						</div>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

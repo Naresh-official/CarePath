@@ -5,20 +5,14 @@ import {
 	useState,
 	type ReactNode,
 } from "react";
-import axios from "axios";
-
-export interface AuthUser {
-	id: string;
-	name: string;
-	email: string;
-	role?: string;
-}
+import { authApi } from "../lib/api";
+import type { User } from "../lib/types";
 
 interface AuthContextType {
-	user: AuthUser | null;
+	user: User | null;
 	loading: boolean;
-	setUser: (user: AuthUser | null) => void; // Add this
-	refetchUser: () => Promise<void>; // Optional: to refetch user
+	setUser: (user: User | null) => void;
+	refetchUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -28,19 +22,14 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-	const [user, setUser] = useState<AuthUser | null>(null);
+	const [user, setUser] = useState<User | null>(null);
 	const [loading, setLoading] = useState<boolean>(true);
 
 	const fetchUser = async () => {
 		try {
-			const { data } = await axios.get(
-				`${import.meta.env.VITE_BACKEND_URL}/auth/me`,
-				{
-					withCredentials: true,
-				}
-			);
-			setUser(data.data);
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			const { data } = await authApi.getCurrentUser();
+			console.log(data);
+			if (data.success) setUser(data.data);
 		} catch (err: unknown) {
 			setUser(null);
 		} finally {
@@ -48,8 +37,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 		}
 	};
 
+	const PUBLIC_ROUTES = ["/", "/login", "/access-denied"];
+
 	useEffect(() => {
-		fetchUser();
+		const currentPath = window.location.pathname;
+
+		const isPublicRoute = PUBLIC_ROUTES.includes(currentPath);
+
+		if (isPublicRoute) {
+			setLoading(false);
+		} else {
+			fetchUser();
+		}
 	}, []);
 
 	return (
