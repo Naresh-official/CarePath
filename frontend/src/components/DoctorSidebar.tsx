@@ -50,9 +50,17 @@ function DoctorSidebar({
 						<NavLink
 							key={route}
 							to={`/doctor/${route}`}
-							onClick={() => setMobileMenuOpen(false)}
+							onClick={(e) => {
+								if (route === "patient-profile")
+									e.preventDefault();
+								setMobileMenuOpen(false);
+							}}
 							className={({ isActive }) =>
-								`w-full text-left px-4 py-2 rounded-lg transition-colors relative block ${
+								`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+									route === "patient-profile"
+										? "cursor-not-allowed"
+										: " "
+								} relative block ${
 									isActive
 										? "bg-sidebar-primary text-sidebar-primary-foreground"
 										: "text-sidebar-foreground hover:bg-sidebar-accent/20"

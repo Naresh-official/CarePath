@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import mongoose from "mongoose";
 import asyncHandler from "../utils/asyncHandler.js";
 import Patient from "../models/Patient.js";
 import Doctor from "../models/Doctor.js";
@@ -132,49 +133,70 @@ export const getDoctorAnalytics = asyncHandler(
 		const assignments = await Assignment.find({ doctorId: doctor._id });
 		const patientIds = assignments.map((a) => a.patientId);
 
-		const [
-			assignedPatients,
-			criticalPatients,
-			activeAlerts,
-			recentCheckIns,
-		] = await Promise.all([
-			Patient.find({ _id: { $in: patientIds } })
-				.populate("userId", "firstName lastName email")
-				.sort({ riskLevel: -1 }),
-			Patient.countDocuments({
-				_id: { $in: patientIds },
-				riskLevel: "critical",
-			}),
-			Alert.find({
-				patientId: { $in: patientIds },
-				status: "active",
-			})
-				.populate("patientId", "userId procedure")
-				.populate({
-					path: "patientId",
-					populate: {
-						path: "userId",
-						select: "firstName lastName",
+		const [patients, criticalPatients, activeAlerts, recentCheckIns] =
+			await Promise.all([
+				Patient.find({ _id: { $in: patientIds } })
+					.populate("userId", "firstName lastName email")
+					.sort({ riskLevel: -1 }),
+				Patient.countDocuments({
+					_id: { $in: patientIds },
+					riskLevel: "critical",
+				}),
+				Alert.find({
+					patientId: { $in: patientIds },
+					status: "active",
+					viewedBy: {
+						$ne: new mongoose.Types.ObjectId(doctorUserId),
 					},
 				})
-				.sort({ severity: -1, createdAt: -1 })
-				.limit(10),
-			SymptomCheckIn.find({
-				patientId: { $in: patientIds },
-			})
-				.populate("patientId", "userId procedure")
-				.populate({
-					path: "patientId",
-					populate: {
-						path: "userId",
-						select: "firstName lastName",
-					},
+					.populate("patientId", "userId procedure")
+					.populate({
+						path: "patientId",
+						populate: {
+							path: "userId",
+							select: "firstName lastName",
+						},
+					})
+					.sort({ severity: -1, createdAt: -1 })
+					.limit(10),
+				SymptomCheckIn.find({
+					patientId: { $in: patientIds },
 				})
-				.sort({ checkInDate: -1 })
-				.limit(10),
-		]);
+					.populate("patientId", "userId procedure")
+					.populate({
+						path: "patientId",
+						populate: {
+							path: "userId",
+							select: "firstName lastName",
+						},
+					})
+					.sort({ checkInDate: -1 })
+					.limit(10),
+			]);
 
-		// Risk distribution
+		// Enhance each patient with alert count and last check-in
+		const assignedPatients = await Promise.all(
+			patients.map(async (patient) => {
+				const [alertCount, lastCheckIn] = await Promise.all([
+					Alert.countDocuments({
+						patientId: patient._id,
+						status: "active",
+						viewedBy: {
+							$ne: new mongoose.Types.ObjectId(doctorUserId),
+						},
+					}),
+					SymptomCheckIn.findOne({ patientId: patient._id })
+						.sort({ checkInDate: -1 })
+						.select("checkInDate"),
+				]);
+
+				return {
+					...patient.toObject(),
+					alertCount,
+					lastCheckIn: lastCheckIn?.checkInDate || null,
+				};
+			})
+		); // Risk distribution
 		const riskDistribution = {
 			stable: assignedPatients.filter((p) => p.riskLevel === "stable")
 				.length,

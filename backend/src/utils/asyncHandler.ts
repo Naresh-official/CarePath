@@ -34,6 +34,7 @@ const asyncHandler =
 				});
 			}
 
+			console.log(error);
 			return res.sendResponse({
 				statusCode: 500,
 				success: false,

@@ -39,3 +39,21 @@ export const authorizePatient = asyncHandler(
 		next();
 	}
 );
+
+// Authorize multiple roles - pass allowed roles as arguments
+export const authorizeRoles = (...allowedRoles: string[]) => {
+	return asyncHandler(
+		async (req: Request, res: Response, next: NextFunction) => {
+			if (!req.user?.role || !allowedRoles.includes(req.user.role)) {
+				return res.status(403).json({
+					statusCode: 403,
+					success: false,
+					message: `Forbidden: Access restricted to ${allowedRoles.join(
+						", "
+					)}`,
+				});
+			}
+			next();
+		}
+	);
+};

@@ -17,11 +17,16 @@ import {
 	getMyMedications,
 	markDoseAsTaken,
 } from "../controllers/medication.controller.js";
+import {
+	getPatientExercises,
+	updateExerciseAssignment,
+} from "../controllers/exercise.controller.js";
+import upload from "../middlewares/upload.middleware.js";
 
 const router = Router();
 
 // Symptom Check-ins (Daily Health Updates)
-router.post("/check-in", submitSymptomCheckIn);
+router.post("/check-in", upload.single("woundImage"), submitSymptomCheckIn);
 router.get("/check-ins/:patientId", getPatientCheckIns);
 router.get("/check-in/:checkInId", getCheckInById);
 router.get("/recovery-trends/:patientId", getRecoveryTrends);
@@ -36,6 +41,10 @@ router.get("/task-stats/:patientId", getTaskStats);
 // Medications (Patient-specific)
 router.get("/medications", getMyMedications);
 router.post("/medications/:id/take-dose", markDoseAsTaken);
+
+// Exercises (Patient can view and update their exercises)
+router.get("/exercises/:patientId", getPatientExercises);
+router.patch("/exercise/:taskId", updateExerciseAssignment);
 
 // Analytics
 router.get("/analytics", getPatientAnalytics);

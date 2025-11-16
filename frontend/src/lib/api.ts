@@ -17,6 +17,8 @@ import type {
 	UpdateAlertData,
 	CreateRoomData,
 	VideoCallSignal,
+	AssignExerciseData,
+	UpdateExerciseData,
 } from "./types";
 
 const API_BASE_URL =
@@ -53,8 +55,17 @@ export const authApi = {
 // ==================== PATIENT API ====================
 export const patientApi = {
 	// Check-ins
-	submitCheckIn: (data: SubmitCheckInData) =>
-		api.post("/patient/check-in", data),
+	submitCheckIn: (data: SubmitCheckInData | FormData) => {
+		// If data is FormData, use multipart/form-data content type
+		if (data instanceof FormData) {
+			return api.post("/patient/check-in", data, {
+				headers: {
+					"Content-Type": "multipart/form-data",
+				},
+			});
+		}
+		return api.post("/patient/check-in", data);
+	},
 	getCheckIns: (patientId: string, params?: PaginationParams) =>
 		api.get(`/patient/check-ins/${patientId}`, { params }),
 	getCheckInById: (checkInId: string) =>
@@ -87,6 +98,12 @@ export const patientApi = {
 	// Patient Details
 	getPatientDetails: (patientId: string) =>
 		api.get(`/doctor/patient/${patientId}`),
+
+	// Exercises (Patient can view and update their exercises)
+	getExercises: (patientId: string) =>
+		api.get(`/patient/exercises/${patientId}`),
+	completeExercise: (taskId: string, data: UpdateExerciseData) =>
+		api.patch(`/patient/exercise/${taskId}`, data),
 };
 
 // ==================== DOCTOR API ====================
@@ -100,12 +117,48 @@ export const doctorApi = {
 		api.patch(`/doctor/note/${noteId}`, data),
 	deleteNote: (noteId: string) => api.delete(`/doctor/note/${noteId}`),
 
+	// Tasks (Doctor can manage tasks for assigned patients)
+	getTasks: (
+		patientId: string,
+		params?: PaginationParams & { status?: string }
+	) => api.get(`/doctor/tasks/${patientId}`, { params }),
+	createTask: (data: CreateTaskData) => api.post("/doctor/task", data),
+	updateTask: (taskId: string, data: UpdateTaskData) =>
+		api.patch(`/doctor/task/${taskId}`, data),
+	deleteTask: (taskId: string) => api.delete(`/doctor/task/${taskId}`),
+	getTaskStats: (patientId: string) =>
+		api.get(`/doctor/task-stats/${patientId}`),
+
 	// Patient details
 	getPatientById: (patientId: string) =>
 		api.get(`/doctor/patient/${patientId}`),
 
+	// Exercises
+	searchExercises: (bodyPart: string) =>
+		api.get("/doctor/exercises/search", { params: { bodyPart } }),
+	getBodyParts: () => api.get("/doctor/exercises/body-parts"),
+	assignExercise: (data: AssignExerciseData) =>
+		api.post("/doctor/exercise/assign", data),
+	getPatientExercises: (patientId: string) =>
+		api.get(`/doctor/exercises/${patientId}`),
+	updateExercise: (taskId: string, data: UpdateExerciseData) =>
+		api.patch(`/doctor/exercise/${taskId}`, data),
+	deleteExercise: (taskId: string) =>
+		api.delete(`/doctor/exercise/${taskId}`),
+	getAllExercises: () => api.get("/doctor/exercises"),
+
 	// Analytics
 	getAnalytics: () => api.get("/doctor/analytics"),
+
+	// Check-ins (Doctor can view patient check-ins)
+	getCheckIns: (patientId: string) =>
+		api.get(`/doctor/check-ins/${patientId}`),
+	markCheckInAsReviewed: (checkInId: string) =>
+		api.patch(`/doctor/check-in/${checkInId}/review`),
+	updatePatientRiskLevel: (
+		patientId: string,
+		riskLevel: "stable" | "monitor" | "critical"
+	) => api.patch(`/doctor/patient/${patientId}/risk-level`, { riskLevel }),
 };
 
 // ==================== ADMIN API ====================

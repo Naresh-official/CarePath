@@ -26,7 +26,7 @@ export interface LoginData {
 }
 
 export interface User {
-	_id: string;
+	id: string;
 	name: string;
 	email: string;
 	role: "Admin" | "Doctor" | "Patient";
@@ -53,7 +53,12 @@ export interface Patient {
 	};
 	dateOfBirth: string;
 	phone?: string;
-	address?: string;
+	address?: {
+		street: string;
+		city: string;
+		state: string;
+		zipCode: string;
+	};
 	procedure: string;
 	procedureDate: string;
 	riskLevel: "stable" | "monitor" | "critical";
@@ -147,6 +152,9 @@ export interface SymptomCheckIn {
 		description?: string;
 	}>;
 	flaggedForReview: boolean;
+	isRead?: boolean;
+	reviewedBy?: string;
+	reviewedAt?: string;
 	checkInDate: string;
 	createdAt: string;
 	riskLevel?: string; // Added for backend response
@@ -167,10 +175,7 @@ export interface SubmitCheckInData {
 		type?: string;
 		description?: string;
 	}>;
-	image?: {
-		url?: string;
-		filename?: string;
-	};
+	woundImage?: File;
 }
 
 export interface RecoveryTrends {
@@ -536,4 +541,52 @@ export interface VideoCallSignal {
 	roomId: string;
 	signal: unknown;
 	targetUserId: string;
+}
+
+// ==================== Exercise Types ====================
+export interface Exercise {
+	_id: string;
+	exerciseDbId: string; // ExerciseDB API ID
+	name: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface ExerciseDBExercise {
+	exerciseId: string;
+	name: string;
+	bodyParts: string[];
+	targetMuscles: string[];
+	equipment: string;
+	gifUrl: string;
+	instructions: string[];
+	secondaryMuscles?: string[];
+}
+
+export interface AssignExerciseData {
+	patientId: string;
+	exerciseData: ExerciseDBExercise;
+	scheduledTime: string;
+	duration?: number;
+	sets?: number;
+	repetitions?: string;
+	priority?: "low" | "medium" | "high";
+	recurring?: {
+		enabled: boolean;
+		frequency: "daily" | "weekly" | "monthly";
+		endDate?: string;
+	};
+}
+
+export interface UpdateExerciseData {
+	completed?: boolean;
+	scheduledTime?: string;
+	priority?: "low" | "medium" | "high";
+	sets?: number;
+	repetitions?: string;
+	duration?: number;
+}
+
+export interface ExerciseTask extends Task {
+	exerciseId?: Exercise;
 }

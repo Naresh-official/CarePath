@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,64 +13,81 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { doctorApi } from "@/lib/api";
+import { toast } from "sonner";
+
+interface PatientData {
+	id: string;
+	name: string;
+	procedure: string;
+	day: number;
+	risk: string;
+	alerts: number;
+	adherence: number;
+	lastCheckin: string;
+}
 
 function DoctorDashboard() {
 	const navigate = useNavigate();
 	const [filterRisk, setFilterRisk] = useState<string | null>(null);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [sortBy, setSortBy] = useState<"name" | "risk" | "day">("risk");
+	const [allPatients, setAllPatients] = useState<PatientData[]>([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
-	const allPatients = [
-		{
-			id: 1,
-			name: "Sarah Johnson",
-			procedure: "ACL Repair",
-			day: 5,
-			risk: "stable",
-			alerts: 0,
-			adherence: 92,
-			lastCheckin: "2 hours ago",
-		},
-		{
-			id: 2,
-			name: "Michael Chen",
-			procedure: "Hip Replacement",
-			day: 2,
-			risk: "monitor",
-			alerts: 1,
-			adherence: 78,
-			lastCheckin: "4 hours ago",
-		},
-		{
-			id: 3,
-			name: "Emma Davis",
-			procedure: "Knee Surgery",
-			day: 7,
-			risk: "critical",
-			alerts: 3,
-			adherence: 65,
-			lastCheckin: "30 min ago",
-		},
-		{
-			id: 4,
-			name: "James Wilson",
-			procedure: "Shoulder Surgery",
-			day: 3,
-			risk: "stable",
-			alerts: 0,
-			adherence: 88,
-			lastCheckin: "1 hour ago",
-		},
-		{
-			id: 5,
-			name: "Lisa Anderson",
-			procedure: "Spine Surgery",
-			day: 1,
-			risk: "monitor",
-			alerts: 2,
-			lastCheckin: "Just now",
-		},
-	];
+	useEffect(() => {
+		fetchPatients();
+	}, []);
+
+	const fetchPatients = async () => {
+		try {
+			setLoading(true);
+			setError(null);
+			const response = await doctorApi.getAnalytics();
+			const { assignedPatients } = response.data.data;
+
+			// Transform backend data to component format
+			const transformedPatients: PatientData[] = assignedPatients.map(
+				(patient: any) => ({
+					id: patient._id,
+					name: `${patient.userId.firstName} ${patient.userId.lastName}`,
+					procedure: patient.procedure,
+					day: patient.daysPostOp || 0,
+					risk: patient.riskLevel,
+					alerts: patient.alertCount || 0,
+					adherence: patient.adherenceRate || 0,
+					lastCheckin: patient.lastCheckIn
+						? formatTimeAgo(new Date(patient.lastCheckIn))
+						: "No check-ins",
+				})
+			);
+
+			setAllPatients(transformedPatients);
+		} catch (err: any) {
+			const errorMessage =
+				err.response?.data?.message || "Failed to fetch patient data";
+			setError(errorMessage);
+			toast.error(errorMessage);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const formatTimeAgo = (date: Date) => {
+		const now = new Date();
+		const diffInMs = now.getTime() - date.getTime();
+		const diffInMins = Math.floor(diffInMs / 60000);
+		const diffInHours = Math.floor(diffInMs / 3600000);
+		const diffInDays = Math.floor(diffInMs / 86400000);
+
+		if (diffInMins < 1) return "Just now";
+		if (diffInMins < 60)
+			return `${diffInMins} min${diffInMins > 1 ? "s" : ""} ago`;
+		if (diffInHours < 24)
+			return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
+		return `${diffInDays} day${diffInDays > 1 ? "s" : ""} ago`;
+	};
 
 	let filteredPatients = allPatients;
 	if (filterRisk) {
@@ -237,7 +254,25 @@ function DoctorDashboard() {
 
 			{/* Patient List */}
 			<div className="space-y-3">
-				{filteredPatients.length > 0 ? (
+				{loading ? (
+					<Card className="p-8 text-center">
+						<p className="text-muted-foreground">
+							Loading patients...
+						</p>
+					</Card>
+				) : error ? (
+					<Card className="p-8 text-center">
+						<p className="text-red-600">{error}</p>
+						<Button
+							onClick={fetchPatients}
+							variant="outline"
+							size="sm"
+							className="mt-4"
+						>
+							Retry
+						</Button>
+					</Card>
+				) : filteredPatients.length > 0 ? (
 					filteredPatients.map((patient) => (
 						<Card
 							key={patient.id}
@@ -249,7 +284,9 @@ function DoctorDashboard() {
 									: "border-l-green-500 hover:border-l-green-600"
 							}`}
 							onClick={() => {
-								navigate(`/patient/${patient.id}`);
+								navigate(
+									`/doctor/patient-profile/${patient.id}`
+								);
 							}}
 						>
 							<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -314,7 +351,9 @@ function DoctorDashboard() {
 									className="w-full md:w-auto"
 									onClick={(e) => {
 										e.stopPropagation();
-										navigate(`/patient/${patient.id}`);
+										navigate(
+											`/doctor/patient-profile/${patient.id}`
+										);
 									}}
 								>
 									View Profile

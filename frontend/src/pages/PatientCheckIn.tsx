@@ -26,6 +26,11 @@ function PatientCheckIn() {
 	const [historyLoading, setHistoryLoading] = useState(true);
 
 	const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+	const [woundImage, setWoundImage] = useState<File | null>(null);
+	const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+	const [canSubmit, setCanSubmit] = useState(true);
+	const [waitTimeMessage, setWaitTimeMessage] = useState("");
 
 	const availableSymptoms = [
 		"Fatigue",
@@ -39,20 +44,27 @@ function PatientCheckIn() {
 	];
 
 	// -------------------------------
-	// Fetch history
+	// Fetch history and check last check-in
 	// -------------------------------
 
 	const fetchCheckInHistory = useCallback(async () => {
-		if (!user?._id) return;
+		if (!user?.id) return;
 
 		try {
 			setHistoryLoading(true);
-			const { data } = await patientApi.getCheckIns(user._id, {
+			const { data } = await patientApi.getCheckIns(user.id, {
 				page: 1,
 				limit: 10,
 			});
 
-			setCheckInHistory(data?.data?.checkIns || data?.data || []);
+			const checkIns = data?.data?.checkIns || data?.data || [];
+			setCheckInHistory(checkIns);
+
+			// Check last check-in for timing validation
+			if (checkIns.length > 0) {
+				const last = checkIns[0];
+				checkSubmitEligibility(last);
+			}
 		} catch (error) {
 			if (isAxiosError(error)) {
 				toast.error(
@@ -63,24 +75,114 @@ function PatientCheckIn() {
 		} finally {
 			setHistoryLoading(false);
 		}
-	}, [user?._id]);
+	}, [user?.id]);
+
+	const checkSubmitEligibility = (lastCheckIn: SymptomCheckIn) => {
+		const now = new Date();
+		const lastDate = new Date(
+			lastCheckIn.checkInDate || lastCheckIn.date || lastCheckIn.createdAt
+		);
+
+		const todayStart = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate()
+		);
+		const lastCheckInStart = new Date(
+			lastDate.getFullYear(),
+			lastDate.getMonth(),
+			lastDate.getDate()
+		);
+
+		// Check if same day
+		if (lastCheckInStart.getTime() === todayStart.getTime()) {
+			setCanSubmit(false);
+			setWaitTimeMessage(
+				"You have already submitted a check-in today. Come back tomorrow!"
+			);
+			return;
+		}
+
+		// Check 8-hour gap
+		const eightHoursInMs = 8 * 60 * 60 * 1000;
+		const timeSinceLastCheckIn = now.getTime() - lastDate.getTime();
+
+		if (timeSinceLastCheckIn < eightHoursInMs) {
+			const hoursRemaining = Math.ceil(
+				(eightHoursInMs - timeSinceLastCheckIn) / (60 * 60 * 1000)
+			);
+			setCanSubmit(false);
+			setWaitTimeMessage(
+				`Please wait ${hoursRemaining} hour(s) before submitting another check-in.`
+			);
+		} else {
+			setCanSubmit(true);
+			setWaitTimeMessage("");
+		}
+	};
 
 	useEffect(() => {
-		if (user?._id) fetchCheckInHistory();
-	}, [user?._id, fetchCheckInHistory]);
+		if (user?.id) fetchCheckInHistory();
+	}, [user?.id, fetchCheckInHistory]);
+
+	// -------------------------------
+	// Image upload handling
+	// -------------------------------
+
+	const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		// Validate file type
+		const validTypes = [
+			"image/jpeg",
+			"image/jpg",
+			"image/png",
+			"image/webp",
+		];
+		if (!validTypes.includes(file.type)) {
+			toast.error("Only JPEG, PNG, and WebP images are allowed");
+			return;
+		}
+
+		// Validate file size (5MB max)
+		if (file.size > 5 * 1024 * 1024) {
+			toast.error("Image size must be less than 5MB");
+			return;
+		}
+
+		setWoundImage(file);
+
+		// Create preview
+		const reader = new FileReader();
+		reader.onloadend = () => {
+			setImagePreview(reader.result as string);
+		};
+		reader.readAsDataURL(file);
+	};
+
+	const removeImage = () => {
+		setWoundImage(null);
+		setImagePreview(null);
+	};
 
 	// -------------------------------
 	// Submit handler
 	// -------------------------------
 
 	const handleSubmit = async () => {
-		if (!user?._id) {
+		if (!user) {
 			toast.error("User not found");
 			return;
 		}
 
-		if (formData.temperature < 30 || formData.temperature > 45) {
-			toast.error("Temperature must be between 30–45°C");
+		if (!canSubmit) {
+			toast.error(waitTimeMessage);
+			return;
+		}
+
+		if (formData.temperature < 30 || formData.temperature > 50) {
+			toast.error("Temperature must be between 30–50°C");
 			return;
 		}
 
@@ -97,39 +199,66 @@ function PatientCheckIn() {
 			const systolic = parseInt(bpParts[0]?.trim() || "0", 10);
 			const diastolic = parseInt(bpParts[1]?.trim() || "0", 10);
 
-			const payload = {
-				patientId: user._id,
-				painLevel: formData.painLevel,
-				temperature: formData.temperature,
-				bloodPressure: {
-					systolic,
-					diastolic,
-				},
-				mood: formData.mood as "poor" | "okay" | "good" | "excellent",
-				notes: formData.notes,
-				symptoms: selectedSymptoms.map((symptom) => ({
-					type: symptom,
-					description: symptom,
-				})),
-			};
+			// If image exists, use FormData, otherwise use JSON
+			let payload: FormData | any;
+
+			if (woundImage) {
+				// Use FormData for multipart upload
+				const formDataPayload = new FormData();
+				formDataPayload.append("userId", user.id);
+				formDataPayload.append(
+					"painLevel",
+					formData.painLevel.toString()
+				);
+				formDataPayload.append(
+					"temperature",
+					formData.temperature.toString()
+				);
+				formDataPayload.append(
+					"bloodPressure[systolic]",
+					systolic.toString()
+				);
+				formDataPayload.append(
+					"bloodPressure[diastolic]",
+					diastolic.toString()
+				);
+				formDataPayload.append("mood", formData.mood);
+				formDataPayload.append("notes", formData.notes);
+				formDataPayload.append("woundImage", woundImage);
+
+				// Add symptoms
+				selectedSymptoms.forEach((symptom, index) => {
+					formDataPayload.append(`symptoms[${index}]`, symptom);
+				});
+
+				payload = formDataPayload;
+			} else {
+				// Use JSON
+				payload = {
+					patientId: user.id,
+					painLevel: formData.painLevel,
+					temperature: formData.temperature,
+					bloodPressure: {
+						systolic,
+						diastolic,
+					},
+					mood: formData.mood as
+						| "poor"
+						| "okay"
+						| "good"
+						| "excellent",
+					notes: formData.notes,
+					symptoms: selectedSymptoms.map((symptom) => ({
+						type: symptom,
+						description: symptom,
+					})),
+				};
+			}
 
 			const { data } = await patientApi.submitCheckIn(payload);
 
 			if (data.success) {
 				toast.success("Check-in submitted successfully!");
-
-				const responseData = data.data as {
-					checkIn?: SymptomCheckIn;
-					riskLevel?: string;
-					flaggedForReview?: boolean;
-				};
-				const checkIn = responseData?.checkIn || responseData;
-
-				if (checkIn?.riskLevel || responseData?.riskLevel) {
-					const riskLevel =
-						checkIn?.riskLevel || responseData?.riskLevel;
-					toast.info(`AI Analysis: ${riskLevel} risk level`);
-				}
 
 				// Reset form
 				setFormData({
@@ -140,6 +269,7 @@ function PatientCheckIn() {
 					notes: "",
 				});
 				setSelectedSymptoms([]);
+				removeImage();
 
 				setSubmitted(true);
 				setTimeout(() => setSubmitted(false), 2500);
@@ -181,17 +311,43 @@ function PatientCheckIn() {
 		);
 	};
 
-	const getRiskBadgeColor = (risk?: string) => {
-		switch (risk) {
-			case "Critical":
-				return "bg-red-100 text-red-800 border-red-200";
-			case "Warning":
-				return "bg-yellow-100 text-yellow-800 border-yellow-200";
-			case "Normal":
-				return "bg-green-100 text-green-800 border-green-200";
-			default:
-				return "bg-gray-100 text-gray-800 border-gray-200";
+	// Add helper to get the most recent check-in
+	const latestCheckIn = checkInHistory.length > 0 ? checkInHistory[0] : null;
+
+	// Helper to calculate time since last check-in
+	const getTimeSinceCheckIn = (date: string | Date) => {
+		const now = new Date();
+		const checkInDate = new Date(date);
+		const diffMs = now.getTime() - checkInDate.getTime();
+		const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+		const diffDays = Math.floor(diffHours / 24);
+
+		if (diffDays > 0) {
+			return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+		} else if (diffHours > 0) {
+			return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+		} else {
+			return "Just now";
 		}
+	};
+
+	// Helper to get risk level based on vitals
+	const getRiskIndicator = (checkIn: SymptomCheckIn) => {
+		if (checkIn.temperature > 38 || checkIn.painLevel >= 8) {
+			return {
+				level: "High Risk",
+				color: "bg-red-100 text-red-800 border-red-200",
+			};
+		} else if (checkIn.painLevel >= 6 || checkIn.temperature > 37.5) {
+			return {
+				level: "Monitor",
+				color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+			};
+		}
+		return {
+			level: "Stable",
+			color: "bg-green-100 text-green-800 border-green-200",
+		};
 	};
 
 	// -------------------------------
@@ -201,6 +357,114 @@ function PatientCheckIn() {
 	return (
 		<div className="max-w-2xl mx-auto p-4 md:p-6 space-y-6">
 			<h1 className="text-3xl font-bold">Symptom Check-in</h1>
+
+			{/* Recent Check-in Section */}
+			{!historyLoading && latestCheckIn && (
+				<Card className="p-6 space-y-4 bg-linear-to-br from-blue-50 to-indigo-50 border-blue-200">
+					<div className="flex justify-between items-start">
+						<div>
+							<h2 className="text-lg font-semibold text-gray-900">
+								Recent Check-in
+							</h2>
+							<p className="text-sm text-gray-600">
+								{getTimeSinceCheckIn(
+									latestCheckIn.checkInDate ||
+										latestCheckIn.date ||
+										latestCheckIn.createdAt
+								)}
+							</p>
+						</div>
+						<div
+							className={`px-3 py-1 rounded-full text-xs font-medium border ${
+								getRiskIndicator(latestCheckIn).color
+							}`}
+						>
+							{getRiskIndicator(latestCheckIn).level}
+						</div>
+					</div>
+
+					<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+						<div className="space-y-1">
+							<p className="text-xs text-gray-600">Pain Level</p>
+							<div className="flex items-baseline gap-1">
+								<p className="text-2xl font-bold text-gray-900">
+									{latestCheckIn.painLevel}
+								</p>
+								<p className="text-sm text-gray-600">/10</p>
+							</div>
+						</div>
+						<div className="space-y-1">
+							<p className="text-xs text-gray-600">Temperature</p>
+							<div className="flex items-baseline gap-1">
+								<p className="text-2xl font-bold text-gray-900">
+									{latestCheckIn.temperature}
+								</p>
+								<p className="text-sm text-gray-600">°C</p>
+							</div>
+						</div>
+						<div className="space-y-1">
+							<p className="text-xs text-gray-600">
+								Blood Pressure
+							</p>
+							<p className="text-2xl font-bold text-gray-900">
+								{latestCheckIn.bloodPressure?.formatted ||
+									(latestCheckIn.bloodPressure?.systolic &&
+									latestCheckIn.bloodPressure?.diastolic
+										? `${latestCheckIn.bloodPressure.systolic}/${latestCheckIn.bloodPressure.diastolic}`
+										: "N/A")}
+							</p>
+						</div>
+						<div className="space-y-1">
+							<p className="text-xs text-gray-600">Mood</p>
+							<p className="text-2xl font-bold text-gray-900 capitalize">
+								{latestCheckIn.mood}
+							</p>
+						</div>
+					</div>
+
+					{latestCheckIn.symptoms &&
+						latestCheckIn.symptoms.length > 0 && (
+							<div className="space-y-2">
+								<p className="text-xs text-gray-600">
+									Active Symptoms
+								</p>
+								<div className="flex flex-wrap gap-2">
+									{latestCheckIn.symptoms.map(
+										(symptom, idx) => (
+											<span
+												key={idx}
+												className="px-3 py-1 bg-white text-gray-700 rounded-full text-sm border border-gray-200"
+											>
+												{symptom.type ||
+													symptom.description}
+											</span>
+										)
+									)}
+								</div>
+							</div>
+						)}
+
+					{latestCheckIn.image?.url && (
+						<div className="space-y-2">
+							<p className="text-xs text-gray-600">Wound Image</p>
+							<img
+								src={latestCheckIn.image.url}
+								alt="Recent wound"
+								className="w-full h-32 object-cover rounded-lg border border-gray-200"
+							/>
+						</div>
+					)}
+				</Card>
+			)}
+
+			{/* Wait time message */}
+			{!canSubmit && waitTimeMessage && (
+				<div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+					<p className="text-sm font-medium text-yellow-800">
+						{waitTimeMessage}
+					</p>
+				</div>
+			)}
 
 			{/* Alerts */}
 			{alerts.length > 0 && (
@@ -353,12 +617,61 @@ function PatientCheckIn() {
 					/>
 				</div>
 
+				{/* Wound Image Upload */}
+				<div className="space-y-3">
+					<label className="font-semibold">
+						Wound Image (Optional)
+					</label>
+					<div className="space-y-3">
+						{imagePreview ? (
+							<div className="relative">
+								<img
+									src={imagePreview}
+									alt="Wound preview"
+									className="w-full h-64 object-cover rounded-lg border"
+								/>
+								<button
+									type="button"
+									onClick={removeImage}
+									className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
+								>
+									✕
+								</button>
+							</div>
+						) : (
+							<div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+								<input
+									type="file"
+									accept="image/jpeg,image/jpg,image/png,image/webp"
+									onChange={handleImageChange}
+									className="hidden"
+									id="wound-image-input"
+								/>
+								<label
+									htmlFor="wound-image-input"
+									className="cursor-pointer"
+								>
+									<div className="space-y-2">
+										<div className="text-4xl">📷</div>
+										<p className="text-sm text-muted-foreground">
+											Click to upload wound image
+										</p>
+										<p className="text-xs text-muted-foreground">
+											JPEG, PNG, WebP (Max 5MB)
+										</p>
+									</div>
+								</label>
+							</div>
+						)}
+					</div>
+				</div>
+
 				{/* Button */}
 				<Button
 					className="w-full"
 					size="lg"
 					onClick={handleSubmit}
-					disabled={loading}
+					disabled={loading || !canSubmit}
 				>
 					{loading ? "Submitting..." : "Submit Check-in"}
 				</Button>
@@ -366,7 +679,7 @@ function PatientCheckIn() {
 
 			{/* History */}
 			<div className="space-y-3">
-				<h2 className="font-semibold text-lg">Recent Check-ins</h2>
+				<h2 className="font-semibold text-lg">Check-in History</h2>
 
 				{historyLoading ? (
 					<div className="space-y-2">
@@ -393,13 +706,6 @@ function PatientCheckIn() {
 												checkin.createdAt
 										).toLocaleString()}
 									</p>
-									<span
-										className={`text-xs px-2 py-1 rounded-md border ${getRiskBadgeColor(
-											checkin.riskLevel
-										)}`}
-									>
-										{checkin.riskLevel || "Logged"}
-									</span>
 								</div>
 
 								<div className="grid grid-cols-3 gap-2 text-sm">
@@ -466,6 +772,16 @@ function PatientCheckIn() {
 									<p className="text-sm text-muted-foreground italic">
 										"{checkin.notes}"
 									</p>
+								)}
+
+								{checkin.image?.url && (
+									<div className="mt-2">
+										<img
+											src={checkin.image.url}
+											alt="Wound image"
+											className="w-full h-48 object-cover rounded-lg border"
+										/>
+									</div>
 								)}
 							</Card>
 						))}

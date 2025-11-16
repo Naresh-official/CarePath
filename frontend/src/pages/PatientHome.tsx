@@ -65,6 +65,12 @@ function PatientHome() {
 	}, [user]);
 
 	const handleTaskToggle = async (taskId: string, completed: boolean) => {
+		// Only allow marking as complete (not undoing)
+		if (!completed) {
+			toast.error("Completed tasks cannot be undone");
+			return;
+		}
+
 		try {
 			await patientApi.updateTask(taskId, { completed });
 			setTasks((prev) =>
@@ -72,9 +78,7 @@ function PatientHome() {
 					task._id === taskId ? { ...task, completed } : task
 				)
 			);
-			toast.success(
-				completed ? "Task completed!" : "Task marked as incomplete"
-			);
+			toast.success("Task completed!");
 		} catch (error: unknown) {
 			console.error("Error updating task:", error);
 			toast.error("Failed to update task");
@@ -183,22 +187,42 @@ function PatientHome() {
 					</Card>
 				) : (
 					<div className="space-y-2">
-						{tasks.slice(0, 5).map((task) => (
-							<TaskItem
-								key={task._id}
-								completed={task.completed}
-								title={task.title}
-								time={new Date(
-									task.scheduledTime
-								).toLocaleTimeString([], {
-									hour: "2-digit",
-									minute: "2-digit",
-								})}
-								onToggle={() =>
-									handleTaskToggle(task._id, !task.completed)
-								}
-							/>
-						))}
+						{tasks.slice(0, 5).map((task) => {
+							const scheduledDate = new Date(task.scheduledTime);
+							const isOverdue =
+								!task.completed && scheduledDate < new Date();
+
+							// Only allow toggle if task is not completed (PatientHome only shows today's tasks)
+							const canToggle = !task.completed;
+
+							return (
+								<TaskItem
+									key={task._id}
+									completed={task.completed}
+									title={task.title}
+									description={task.description}
+									priority={task.priority}
+									type={task.type}
+									isOverdue={isOverdue}
+									time={scheduledDate.toLocaleTimeString(
+										"en-US",
+										{
+											hour: "numeric",
+											minute: "2-digit",
+										}
+									)}
+									onToggle={
+										canToggle
+											? () =>
+													handleTaskToggle(
+														task._id,
+														!task.completed
+													)
+											: undefined
+									}
+								/>
+							);
+						})}
 					</div>
 				)}
 			</div>

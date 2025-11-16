@@ -231,20 +231,6 @@ function Alerts() {
 														.toUpperCase() +
 														alert.status.slice(1)}
 												</Badge>
-												<Badge
-													variant="secondary"
-													className={`${
-														alert.severity ===
-														"critical"
-															? "bg-red-100 text-red-800"
-															: alert.severity ===
-															  "warning"
-															? "bg-yellow-100 text-yellow-800"
-															: "bg-gray-100 text-gray-800"
-													}`}
-												>
-													{alert.severity}
-												</Badge>
 											</div>
 											<p className="text-sm text-foreground mb-1">
 												{alert.message}

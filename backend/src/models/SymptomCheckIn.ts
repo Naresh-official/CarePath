@@ -21,6 +21,7 @@ export interface ISymptomCheckIn extends Document {
 		description?: string;
 	}>;
 	flaggedForReview: boolean;
+	isRead: boolean;
 	reviewedBy?: mongoose.Types.ObjectId;
 	reviewedAt?: Date;
 	checkInDate: Date;
@@ -71,6 +72,10 @@ const symptomCheckInSchema = new Schema<ISymptomCheckIn>(
 			},
 		],
 		flaggedForReview: {
+			type: Boolean,
+			default: false,
+		},
+		isRead: {
 			type: Boolean,
 			default: false,
 		},
