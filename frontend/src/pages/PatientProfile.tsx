@@ -15,31 +15,30 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
-import { patientApi, medicationApi, doctorApi } from "@/lib/api";
+import { patientApi, medicationApi, doctorApi, messageApi } from "@/lib/api";
 import type {
 	Patient,
 	Medication,
 	Task,
 	ExerciseTask,
 	SymptomCheckIn,
+	Message as ApiMessage,
 } from "@/lib/types";
 import PatientProfileHeader from "@/components/patient-profile/PatientProfileHeader";
 import PatientOverview from "@/components/patient-profile/PatientOverview";
 import MedicationManagement from "@/components/patient-profile/MedicationManagement";
 import TaskManagement from "@/components/patient-profile/TaskManagement";
 import ExerciseManagement from "@/components/patient-profile/ExerciseManagement";
+import PatientMessages from "@/components/patient-profile/PatientMessages";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
+import { useAuth } from "@/context/AuthContext";
+import { getSocket } from "@/lib/socket";
 
 function PatientProfile() {
 	const { patientId } = useParams<{ patientId: string }>();
 	const navigate = useNavigate();
+	const { user } = useAuth();
 
 	const [activeTab, setActiveTab] = useState<
 		| "overview"
@@ -57,99 +56,7 @@ function PatientProfile() {
 	const [checkIns, setCheckIns] = useState<SymptomCheckIn[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [messageInput, setMessageInput] = useState("");
-	const [callState, setCallState] = useState<
-		"idle" | "ringing" | "connected" | "ended"
-	>("idle");
-	const [isMuted, setIsMuted] = useState(false);
-	const [isVideoOn, setIsVideoOn] = useState(true);
-	const [callDuration, setCallDuration] = useState(0);
-	const [conversations, setConversations] = useState([
-		{
-			id: 1,
-			name: "Dr. Johnson",
-			role: "Surgeon",
-			lastMessage: "How are you feeling today?",
-			time: "2:30 PM",
-			unread: true,
-			messages: [
-				{
-					sender: "Dr. Johnson",
-					text: "How are you feeling today?",
-					time: "2:30 PM",
-					isUser: false,
-					status: "read",
-				},
-				{
-					sender: "You",
-					text: "Much better, thanks for checking in!",
-					time: "2:45 PM",
-					isUser: true,
-					status: "read",
-				},
-			],
-			callHistory: [
-				{
-					type: "video",
-					duration: "12:34",
-					date: "Today at 1:00 PM",
-					status: "completed",
-				},
-			],
-		},
-		{
-			id: 2,
-			name: "Nurse Sarah",
-			role: "Care Coordinator",
-			lastMessage: "Remember to take your evening medication",
-			time: "1:15 PM",
-			unread: true,
-			messages: [
-				{
-					sender: "Nurse Sarah",
-					text: "Remember to take your evening medication",
-					time: "1:15 PM",
-					isUser: false,
-					status: "read",
-				},
-			],
-			callHistory: [],
-		},
-		{
-			id: 3,
-			name: "Dr. Martinez",
-			role: "Physical Therapist",
-			lastMessage: "Great progress on your exercises!",
-			time: "Yesterday",
-			unread: false,
-			messages: [
-				{
-					sender: "Dr. Martinez",
-					text: "Great progress on your exercises!",
-					time: "Yesterday",
-					isUser: false,
-					status: "read",
-				},
-			],
-			callHistory: [
-				{
-					type: "video",
-					duration: "8:15",
-					date: "Yesterday at 3:30 PM",
-					status: "completed",
-				},
-				{
-					type: "video",
-					duration: "5:42",
-					date: "2 days ago at 2:00 PM",
-					status: "completed",
-				},
-			],
-		},
-	]);
-	const [selectedConversation, setSelectedConversation] = useState(
-		conversations[0]
-	);
+	const [patientUnreadCount, setPatientUnreadCount] = useState(0);
 
 	// Dialog state for check-in details
 	const [selectedCheckIn, setSelectedCheckIn] =
@@ -219,6 +126,35 @@ function PatientProfile() {
 		}
 	}, [patientId]);
 
+	const refreshPatientUnreadCount = useCallback(async () => {
+		if (!user || !patient) return;
+		try {
+			const response = await messageApi.getAllConversations();
+			const data = (response.data.data || []) as Array<{
+				conversationId: string;
+				otherUser: {
+					_id: string;
+					firstName: string;
+					lastName: string;
+					role: string;
+				};
+				lastMessage?: ApiMessage;
+				unreadCount?: number;
+			}>;
+
+			const patientConvs = data.filter(
+				(c) => c.otherUser._id === patient.userId._id
+			);
+			const totalUnread = patientConvs.reduce(
+				(sum, c) => sum + (c.unreadCount || 0),
+				0
+			);
+			setPatientUnreadCount(totalUnread);
+		} catch {
+			// ignore
+		}
+	}, [user, patient]);
+
 	const handleCheckInClick = (checkIn: SymptomCheckIn) => {
 		setSelectedCheckIn(checkIn);
 		setSelectedRiskLevel(patient?.riskLevel || "stable");
@@ -244,89 +180,47 @@ function PatientProfile() {
 	};
 
 	useEffect(() => {
-		let interval: ReturnType<typeof setInterval> | undefined;
-		if (callState === "connected") {
-			interval = setInterval(() => {
-				setCallDuration((prev) => prev + 1);
-			}, 1000);
-		}
-		return () => clearInterval(interval);
-	}, [callState]);
+		if (!user || !patient) return;
+		const socket = getSocket();
 
-	const handleSendMessage = () => {
-		if (!messageInput.trim()) return;
+		const handleNewMessage = (msg: unknown) => {
+			try {
+				const rawSender = (msg as Record<string, unknown>)?.senderId;
+				const rawReceiver = (msg as Record<string, unknown>)
+					?.receiverId;
+				const senderId =
+					rawSender && typeof rawSender === "object"
+						? (rawSender as Record<string, unknown>)._id
+						: rawSender;
+				const receiverId =
+					rawReceiver && typeof rawReceiver === "object"
+						? (rawReceiver as Record<string, unknown>)._id
+						: rawReceiver;
 
-		const updatedConversations = conversations.map((conv) => {
-			if (conv.id === selectedConversation.id) {
-				return {
-					...conv,
-					messages: [
-						...conv.messages,
-						{
-							sender: "You",
-							text: messageInput,
-							time: new Date().toLocaleTimeString([], {
-								hour: "2-digit",
-								minute: "2-digit",
-							}),
-							isUser: true,
-							status: "sent",
-						},
-					],
-					lastMessage: messageInput,
-					unread: false,
-				};
+				if (!senderId || !receiverId) return;
+
+				const patientUserId = patient.userId._id;
+
+				if (receiverId === user.id && senderId === patientUserId) {
+					setPatientUnreadCount((prev) => prev + 1);
+				}
+			} catch {
+				// ignore
 			}
-			return conv;
-		});
-		setConversations(updatedConversations);
-		setSelectedConversation(
-			updatedConversations.find((c) => c.id === selectedConversation.id)!
-		);
-		setMessageInput("");
-	};
+		};
 
-	const handleInitiateCall = () => {
-		setCallState("ringing");
-		setCallDuration(0);
-		setTimeout(() => {
-			setCallState("connected");
-		}, 3000);
-	};
+		const handleMessageRead = () => {
+			refreshPatientUnreadCount();
+		};
 
-	const handleEndCall = () => {
-		const updatedConversations = conversations.map((conv) => {
-			if (conv.id === selectedConversation.id) {
-				return {
-					...conv,
-					callHistory: [
-						{
-							type: "video",
-							duration: `${Math.floor(
-								callDuration / 60
-							)}:${String(callDuration % 60).padStart(2, "0")}`,
-							date: new Date().toLocaleString(),
-							status: "completed",
-						},
-						...conv.callHistory,
-					],
-				};
-			}
-			return conv;
-		});
-		setConversations(updatedConversations);
-		setSelectedConversation(
-			updatedConversations.find((c) => c.id === selectedConversation.id)!
-		);
-		setCallState("idle");
-		setCallDuration(0);
-	};
+		socket.on("message:new", handleNewMessage);
+		socket.on("message:read", handleMessageRead);
 
-	const formatCallDuration = (seconds: number) => {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}:${String(secs).padStart(2, "0")}`;
-	};
+		return () => {
+			socket.off("message:new", handleNewMessage);
+			socket.off("message:read", handleMessageRead);
+		};
+	}, [user, patient, refreshPatientUnreadCount]);
 
 	const handleUpdateRiskLevel = async () => {
 		if (!patientId) return;
@@ -426,11 +320,22 @@ function PatientProfile() {
 								: "text-muted-foreground hover:text-foreground"
 						}`}
 					>
-						{tab === "checkins"
-							? "Check-Ins"
-							: tab === "messages"
-							? "Messages"
-							: tab.charAt(0).toUpperCase() + tab.slice(1)}
+						{tab === "checkins" ? (
+							"Check-Ins"
+						) : tab === "messages" ? (
+							<span className="inline-flex items-center gap-2">
+								<span>Messages</span>
+								{patientUnreadCount > 0 && (
+									<span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] min-w-4 h-4 px-1">
+										{patientUnreadCount > 9
+											? "9+"
+											: patientUnreadCount}
+									</span>
+								)}
+							</span>
+						) : (
+							tab.charAt(0).toUpperCase() + tab.slice(1)
+						)}
 					</button>
 				))}
 			</div>
@@ -639,220 +544,7 @@ function PatientProfile() {
 				)}
 
 				{activeTab === "messages" && (
-					<Card className="p-4 md:p-6">
-						<Tabs defaultValue="chat" className="w-full">
-							<TabsList className="mb-4">
-								<TabsTrigger value="chat">Message</TabsTrigger>
-								<TabsTrigger value="video">
-									Video calling
-								</TabsTrigger>
-							</TabsList>
-							<TabsContent value="chat">
-								<div className="flex flex-col md:flex-row gap-4">
-									<div className="md:w-64 flex flex-col border-b md:border-b-0 md:border-r border-border pb-4 md:pb-0 md:pr-4">
-										<h2 className="text-lg font-semibold text-foreground mb-2">
-											Conversations
-										</h2>
-										<div className="space-y-2 max-h-64 overflow-y-auto">
-											{conversations.map((conv) => (
-												<button
-													key={conv.id}
-													type="button"
-													onClick={() => {
-														setSelectedConversation(conv);
-														setCallState("idle");
-													}}
-													className={`w-full text-left p-3 rounded-lg border transition-colors ${
-														selectedConversation.id === conv.id
-															? "bg-primary/10 border-primary"
-															: "hover:bg-muted border-transparent"
-													}`}
-												>
-													<p className="font-medium text-foreground">
-														{conv.name}
-													</p>
-													<p className="text-xs text-muted-foreground">
-														{conv.role}
-													</p>
-													<p className="text-sm text-muted-foreground truncate mt-1">
-														{conv.lastMessage}
-													</p>
-												</button>
-											))}
-										</div>
-									</div>
-									<div className="flex-1 flex flex-col">
-										<div className="mb-3">
-											<p className="text-sm font-medium text-foreground">
-												{selectedConversation.name}
-											</p>
-											<p className="text-xs text-muted-foreground">
-												{selectedConversation.role}
-											</p>
-										</div>
-										<div className="flex-1 space-y-3 overflow-y-auto mb-3 max-h-64">
-											{selectedConversation.messages.map((msg, idx) => (
-												<div
-													key={idx}
-													className={`flex ${
-														msg.isUser ? "justify-end" : "justify-start"
-													}`}
-												>
-													<div
-														className={`max-w-xs p-3 rounded-lg ${
-															msg.isUser
-																? "bg-primary text-primary-foreground"
-																: "bg-muted text-foreground"
-														}`}
-													>
-														<p className="text-sm">{msg.text}</p>
-														<p className="text-xs opacity-70 mt-1">
-															{msg.time}
-														</p>
-													</div>
-												</div>
-											))}
-										</div>
-										<div className="flex gap-2 pt-2 border-t border-border">
-											<input
-												type="text"
-												placeholder="Type a message..."
-												value={messageInput}
-												onChange={(e) => setMessageInput(e.target.value)}
-												onKeyDown={(e) => {
-													if (e.key === "Enter") handleSendMessage();
-												}}
-												className="flex-1 px-3 py-2 border border-border rounded-lg bg-input text-foreground"
-												disabled={callState !== "idle"}
-											/>
-											<Button
-													onClick={handleSendMessage}
-													disabled={!messageInput.trim() || callState !== "idle"}
-											>
-												Send
-											</Button>
-										</div>
-									</div>
-								</div>
-							</TabsContent>
-							<TabsContent value="video">
-								<div className="space-y-4">
-									<div className="flex items-center justify-between">
-										<div>
-											<p className="text-lg font-semibold text-foreground">
-												Video calling
-											</p>
-											<p className="text-sm text-muted-foreground">
-												Start a quick video check-in with the patient.
-											</p>
-										</div>
-										{callState === "idle" && (
-											<Button
-												onClick={handleInitiateCall}
-												className="bg-green-600 hover:bg-green-700 text-white"
-											>
-												Start Video Call
-											</Button>
-										)}
-									</div>
-									{callState !== "idle" && (
-										<Card className="p-4 bg-linear-to-r from-blue-50 to-purple-50 border-blue-200">
-											<div className="flex flex-col gap-4">
-												<div className="flex items-center justify-between">
-													<div>
-														<p className="font-semibold text-foreground">
-															{callState === "ringing" ? "Calling..." : "Connected"}
-														</p>
-														<p className="text-sm text-muted-foreground">
-															{callState === "ringing"
-																	? "Waiting for response..."
-																	: formatCallDuration(callDuration)}
-														</p>
-													</div>
-												</div>
-												<div className="bg-black rounded-lg aspect-video flex items-center justify-center relative overflow-hidden">
-													{isVideoOn ? (
-														<div className="w-full h-full bg-linear-to-br from-gray-800 to-black flex items-center justify-center">
-															<div className="text-center">
-																<div className="text-6xl mb-2">📹</div>
-																<p className="text-white text-sm">Your video</p>
-															</div>
-														</div>
-													) : (
-														<div className="flex flex-col items-center justify-center gap-2">
-															<div className="text-4xl">🎥</div>
-															<p className="text-white text-sm">Video off</p>
-														</div>
-													)}
-													<div className="absolute top-4 right-4 w-24 h-24 bg-gray-700 rounded-lg flex items-center justify-center border-2 border-white">
-														<div className="text-center">
-															<div className="text-3xl">👨‍⚕️</div>
-															<p className="text-white text-xs mt-1">
-																{selectedConversation.name}
-															</p>
-														</div>
-													</div>
-												</div>
-												<div className="flex items-center justify-center gap-4 mt-4">
-													<Button
-														onClick={() => setIsMuted(!isMuted)}
-														variant={isMuted ? "destructive" : "outline"}
-														className="rounded-full w-12 h-12 p-0 flex items-center justify-center"
-														title={isMuted ? "Unmute" : "Mute"}
-													>
-														{isMuted ? "🔇" : "🎤"}
-													</Button>
-													<Button
-														onClick={() => setIsVideoOn(!isVideoOn)}
-														variant={!isVideoOn ? "destructive" : "outline"}
-														className="rounded-full w-12 h-12 p-0 flex items-center justify-center"
-														title={isVideoOn ? "Turn off video" : "Turn on video"}
-													>
-														{isVideoOn ? "📹" : "🎥"}
-													</Button>
-													<Button
-														onClick={handleEndCall}
-														className="bg-red-600 hover:bg-red-700 text-white rounded-full w-12 h-12 p-0 flex items-center justify-center"
-														title="End call"
-													>
-														☎️
-													</Button>
-												</div>
-											</div>
-										</Card>
-									)}
-									{selectedConversation.callHistory.length > 0 && (
-										<div>
-											<p className="text-xs font-semibold text-muted-foreground mb-2">
-												Call history
-											</p>
-											<div className="space-y-2">
-												{selectedConversation.callHistory.map((call, idx) => (
-													<div
-														key={idx}
-														className="flex items-center gap-3 p-2 rounded bg-muted/50"
-													>
-														<span className="text-lg">📹</span>
-														<div className="flex-1 min-w-0">
-															<p className="text-sm font-medium text-foreground">
-																Video Call
-															</p>
-															<p className="text-xs text-muted-foreground">
-																{call.date}
-															</p>
-														</div>
-														<p className="text-sm font-medium text-foreground">
-															{call.duration}
-														</p>
-													</div>
-												))}
-											</div>
-										</div>
-									)}
-								</div>
-							</TabsContent>
-						</Tabs>
-					</Card>
+					<PatientMessages patient={patient} activeTab={activeTab} />
 				)}
 			</div>
 

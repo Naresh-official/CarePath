@@ -4,10 +4,12 @@ import { ApiError } from "../utils/apiError.js";
 import { validateRequest } from "../utils/validation.js";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import { getIO } from "../socket.js";
 
 // Send a message
 export const sendMessage = asyncHandler(async (req: Request, res: Response) => {
-	const { receiverId, text, attachments } = req.body;
+	const { receiverId, text, attachments, conversationId: clientConversationId } =
+		req.body;
 
 	validateRequest([
 		{
@@ -32,8 +34,12 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response) => {
 		throw new ApiError("Receiver not found", 404);
 	}
 
-	// Create conversation ID (sorted to ensure consistency)
-	const conversationId = [senderId, receiverId].sort().join("-");
+	// Determine conversation ID
+	// If client provides one, use it to allow multiple conversations between same users.
+	// Otherwise, fall back to the legacy pair-based conversation ID for backward compatibility.
+	const conversationId: string = clientConversationId
+		? String(clientConversationId)
+		: [senderId, receiverId].sort().join("-");
 
 	const message = await Message.create({
 		conversationId,
@@ -49,8 +55,15 @@ export const sendMessage = asyncHandler(async (req: Request, res: Response) => {
 		.populate("senderId", "firstName lastName role")
 		.populate("receiverId", "firstName lastName role");
 
-	// TODO: Emit socket event for real-time delivery
-	// io.to(receiverId).emit("new-message", populatedMessage);
+	try {
+		const io = getIO();
+		if (populatedMessage) {
+			io.to(receiverId.toString()).emit("message:new", populatedMessage);
+			io.to(senderId.toString()).emit("message:sent", populatedMessage);
+		}
+	} catch (error) {
+		// Socket server might not be initialized in some environments; ignore errors here
+	}
 
 	return res.sendResponse({
 		statusCode: 201,
@@ -103,6 +116,58 @@ export const getConversation = asyncHandler(
 			message: "Conversation retrieved successfully",
 			data: {
 				messages: messages.reverse(), // Most recent at bottom
+				pagination: {
+					currentPage: Number(page),
+					totalPages: Math.ceil(total / Number(limit)),
+					total,
+					limit: Number(limit),
+				},
+			},
+		});
+	}
+);
+
+// Get conversation by conversationId
+export const getConversationById = asyncHandler(
+	async (req: Request, res: Response) => {
+		const { conversationId } = req.params;
+		const { page = 1, limit = 50 } = req.query;
+
+		const currentUserId = req.user?.id;
+		if (!currentUserId) {
+			throw new ApiError("Unauthorized", 401);
+		}
+
+		const skip = (Number(page) - 1) * Number(limit);
+
+		const [messages, total] = await Promise.all([
+			Message.find({ conversationId })
+				.populate("senderId", "firstName lastName role")
+				.populate("receiverId", "firstName lastName role")
+				.sort({ createdAt: -1 })
+				.skip(skip)
+				.limit(Number(limit)),
+			Message.countDocuments({ conversationId }),
+		]);
+
+		// Mark messages as read for this user
+		await Message.updateMany(
+			{
+				conversationId,
+				receiverId: currentUserId,
+				status: { $ne: "read" },
+			},
+			{
+				$set: { status: "read", readAt: new Date() },
+			}
+		);
+
+		return res.sendResponse({
+			statusCode: 200,
+			success: true,
+			message: "Conversation retrieved successfully",
+			data: {
+				messages: messages.reverse(),
 				pagination: {
 					currentPage: Number(page),
 					totalPages: Math.ceil(total / Number(limit)),
@@ -185,6 +250,16 @@ export const markAsRead = asyncHandler(async (req: Request, res: Response) => {
 	message.status = "read";
 	message.readAt = new Date();
 	await message.save();
+
+	try {
+		const io = getIO();
+		io.to(message.senderId.toString()).emit("message:read", {
+			messageId: message._id,
+			conversationId: message.conversationId,
+		});
+	} catch (error) {
+		// Ignore socket errors
+	}
 
 	return res.sendResponse({
 		statusCode: 200,

@@ -200,6 +200,10 @@ export const messageApi = {
 	sendMessage: (data: SendMessageData) => api.post("/messages/send", data),
 	getConversation: (userId: string, params?: PaginationParams) =>
 		api.get(`/messages/conversation/${userId}`, { params }),
+	getConversationById: (
+		conversationId: string,
+		params?: PaginationParams
+	) => api.get(`/messages/conversation-id/${conversationId}`, { params }),
 	getAllConversations: () => api.get("/messages/conversations"),
 	markAsRead: (messageId: string) =>
 		api.patch(`/messages/mark-read/${messageId}`),

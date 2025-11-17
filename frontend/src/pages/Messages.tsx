@@ -1,8 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { messageApi, patientApi } from "@/lib/api";
+import { getSocket } from "@/lib/socket";
+import type { Message as ApiMessage } from "@/lib/types";
+import { toast } from "sonner";
 
 function Messages() {
+	const { user } = useAuth();
 	const [messageInput, setMessageInput] = useState("");
 	const [callState, setCallState] = useState<
 		"idle" | "ringing" | "connected" | "ended"
@@ -10,92 +16,80 @@ function Messages() {
 	const [isMuted, setIsMuted] = useState(false);
 	const [isVideoOn, setIsVideoOn] = useState(true);
 	const [callDuration, setCallDuration] = useState(0);
-	const [conversations, setConversations] = useState([
-		{
-			id: 1,
-			name: "Dr. Johnson",
-			role: "Surgeon",
-			lastMessage: "How are you feeling today?",
-			time: "2:30 PM",
-			unread: true,
-			messages: [
-				{
-					sender: "Dr. Johnson",
-					text: "How are you feeling today?",
-					time: "2:30 PM",
-					isUser: false,
-					status: "read",
-				},
-				{
-					sender: "You",
-					text: "Much better, thanks for checking in!",
-					time: "2:45 PM",
-					isUser: true,
-					status: "read",
-				},
-			],
-			callHistory: [
-				{
-					type: "video",
-					duration: "12:34",
-					date: "Today at 1:00 PM",
-					status: "completed",
-				},
-			],
-		},
-		{
-			id: 2,
-			name: "Nurse Sarah",
-			role: "Care Coordinator",
-			lastMessage: "Remember to take your evening medication",
-			time: "1:15 PM",
-			unread: true,
-			messages: [
-				{
-					sender: "Nurse Sarah",
-					text: "Remember to take your evening medication",
-					time: "1:15 PM",
-					isUser: false,
-					status: "read",
-				},
-			],
-			callHistory: [],
-		},
-		{
-			id: 3,
-			name: "Dr. Martinez",
-			role: "Physical Therapist",
-			lastMessage: "Great progress on your exercises!",
-			time: "Yesterday",
-			unread: false,
-			messages: [
-				{
-					sender: "Dr. Martinez",
-					text: "Great progress on your exercises!",
-					time: "Yesterday",
-					isUser: false,
-					status: "read",
-				},
-			],
-			callHistory: [
-				{
-					type: "video",
-					duration: "8:15",
-					date: "Yesterday at 3:30 PM",
-					status: "completed",
-				},
-				{
-					type: "video",
-					duration: "5:42",
-					date: "2 days ago at 2:00 PM",
-					status: "completed",
-				},
-			],
-		},
-	]);
-	const [selectedConversation, setSelectedConversation] = useState(
-		conversations[0]
+	const [conversations, setConversations] = useState<any[]>([]);
+	const [selectedConversation, setSelectedConversation] = useState<any | null>(
+		null
 	);
+
+	const generateConversationId = () => {
+		return `${user?.id || "u"}-${Date.now()}-${Math.random()
+			.toString(36)
+			.slice(2, 8)}`;
+	};
+
+	const loadMessagesForConversation = async (conversationId: string) => {
+		if (!user) return;
+		try {
+			const response = await messageApi.getConversationById(conversationId);
+			const payload = response.data.data as {
+				messages?: ApiMessage[];
+			};
+			const apiMessages = (payload?.messages || []) as ApiMessage[];
+			const last = apiMessages[apiMessages.length - 1] as
+				| ApiMessage
+				| undefined;
+
+			setConversations((prev) => {
+				const updated = prev.map((conv) => {
+					if (String(conv.conversationId) === String(conversationId)) {
+						return {
+							...conv,
+							messages: apiMessages.map((m) => {
+								const rawSender = (m as unknown as any).senderId;
+								const senderId =
+									rawSender && typeof rawSender === "object"
+										? rawSender._id
+										: rawSender;
+								const isUserMessage = senderId === user.id;
+								return {
+									sender: isUserMessage ? "You" : conv.name,
+									text: m.text,
+									time: new Date(m.createdAt).toLocaleTimeString(
+										[],
+										{
+											hour: "2-digit",
+											minute: "2-digit",
+										}
+									),
+									isUser: isUserMessage,
+									status: m.status,
+								};
+							}),
+							lastMessage: last?.text || "",
+							time: last?.createdAt
+								? new Date(last.createdAt).toLocaleTimeString([], {
+											hour: "2-digit",
+											minute: "2-digit",
+										})
+								: "",
+							unread: false,
+						};
+					}
+					return conv;
+				});
+				const newlySelected =
+					updated.find(
+						(c) => String(c.conversationId) === String(conversationId)
+					) || updated[0];
+				if (newlySelected) {
+					setSelectedConversation(newlySelected);
+				}
+				return updated;
+			});
+		} catch (err) {
+			toast.error("Failed to load messages");
+		}
+	};
 
 	useEffect(() => {
 		let interval: ReturnType<typeof setInterval> | undefined;
@@ -107,37 +101,174 @@ function Messages() {
 		return () => clearInterval(interval);
 	}, [callState]);
 
-	const handleSendMessage = () => {
-		if (!messageInput.trim()) return;
-
-		const updatedConversations = conversations.map((conv) => {
-			if (conv.id === selectedConversation.id) {
-				return {
-					...conv,
-					messages: [
-						...conv.messages,
-						{
-							sender: "You",
-							text: messageInput,
-							time: new Date().toLocaleTimeString([], {
-								hour: "2-digit",
-								minute: "2-digit",
-							}),
-							isUser: true,
-							status: "sent",
-						},
-					],
-					lastMessage: messageInput,
-					unread: false,
+	useEffect(() => {
+		if (!user) return;
+		let isMounted = true;
+		const initializeConversation = async () => {
+			try {
+				const analyticsRes = await patientApi.getAnalytics();
+				const analyticsData = analyticsRes.data.data as {
+					assignedDoctor?: any;
 				};
+				const assignedDoctor = analyticsData?.assignedDoctor;
+				const doctorUser = assignedDoctor?.userId;
+
+				if (!doctorUser?._id) {
+					if (isMounted) {
+						setConversations([]);
+						setSelectedConversation(null);
+					}
+					toast.error("No doctor assigned yet");
+					return;
+				}
+
+				if (!isMounted) return;
+
+				// Load existing conversations with this doctor
+				const convRes = await messageApi.getAllConversations();
+				const data = (convRes.data.data || []) as Array<{
+					conversationId: string;
+					otherUser: {
+						_id: string;
+						firstName: string;
+						lastName: string;
+						role: string;
+					};
+					lastMessage?: ApiMessage;
+					unreadCount?: number;
+				}>;
+
+				const doctorConvs = data.filter(
+					(c) => c.otherUser._id === doctorUser._id
+				);
+
+				const existingConversations = doctorConvs.map((conv) => {
+					const last = conv.lastMessage as ApiMessage | undefined;
+					return {
+						id: doctorUser._id,
+						conversationId: conv.conversationId,
+						name: `${doctorUser.firstName} ${doctorUser.lastName}`,
+						role: conv.otherUser.role || assignedDoctor.role || "Doctor",
+						lastMessage: last?.text || "",
+						time: last?.createdAt
+							? new Date(last.createdAt).toLocaleTimeString([], {
+									hour: "2-digit",
+									minute: "2-digit",
+								})
+							: "",
+						unread: (conv.unreadCount || 0) > 0,
+						messages: [],
+						callHistory: [],
+					};
+				});
+
+				// Always start with a fresh new chat on load
+				const newChatConv = {
+					id: doctorUser._id,
+					conversationId: generateConversationId(),
+					name: `${doctorUser.firstName} ${doctorUser.lastName}`,
+					role: assignedDoctor.role || "Doctor",
+					lastMessage: "",
+					time: "",
+					unread: false,
+					messages: [],
+					callHistory: [],
+					isNew: true,
+				};
+
+				setConversations([newChatConv, ...existingConversations]);
+				setSelectedConversation(newChatConv);
+			} catch (err) {
+				if (isMounted) {
+					toast.error("Failed to load conversations");
+				}
 			}
-			return conv;
-		});
-		setConversations(updatedConversations);
-		setSelectedConversation(
-			updatedConversations.find((c) => c.id === selectedConversation.id)!
-		);
+		};
+
+		initializeConversation();
+		return () => {
+			isMounted = false;
+		};
+	}, [user]);
+
+	useEffect(() => {
+		if (!user) return;
+		const socket = getSocket();
+
+		const handleNewMessage = (msg: any) => {
+			try {
+				const rawSender = msg?.senderId;
+				const rawReceiver = msg?.receiverId;
+				const senderId =
+					rawSender && typeof rawSender === "object"
+						? rawSender._id
+						: rawSender;
+				const receiverId =
+					rawReceiver && typeof rawReceiver === "object"
+						? rawReceiver._id
+						: rawReceiver;
+
+				if (!senderId || !receiverId) return;
+
+				const otherUserId =
+					senderId === user.id ? receiverId : senderId === receiverId
+						? null
+						: senderId;
+
+				if (!otherUserId) return;
+				const msgConversationId = msg?.conversationId;
+				if (
+					selectedConversation &&
+					msgConversationId &&
+					String(selectedConversation.conversationId) ===
+						String(msgConversationId)
+				) {
+					loadMessagesForConversation(String(msgConversationId));
+				}
+			} catch {
+				// ignore
+			}
+		};
+
+		const handleMessageRead = () => {
+			if (selectedConversation?.conversationId) {
+				loadMessagesForConversation(
+					String(selectedConversation.conversationId)
+				);
+			}
+		};
+
+		socket.on("message:new", handleNewMessage);
+		socket.on("message:read", handleMessageRead);
+
+		return () => {
+			socket.off("message:new", handleNewMessage);
+			socket.off("message:read", handleMessageRead);
+		};
+	}, [user, selectedConversation]);
+
+	const handleSendMessage = async () => {
+		if (!messageInput.trim() || !selectedConversation) return;
+		if (!user) {
+			toast.error("You must be logged in to send messages");
+			return;
+		}
+
+		const text = messageInput;
 		setMessageInput("");
+		try {
+			await messageApi.sendMessage({
+				receiverId: String(selectedConversation.id),
+				text,
+				conversationId: String(selectedConversation.conversationId),
+			});
+			await loadMessagesForConversation(
+				String(selectedConversation.conversationId)
+			);
+		} catch (err) {
+			toast.error("Failed to send message");
+			setMessageInput(text);
+		}
 	};
 
 	const handleInitiateCall = () => {
@@ -176,6 +307,28 @@ function Messages() {
 		setCallDuration(0);
 	};
 
+	const handleNewChat = () => {
+		if (!conversations.length) return;
+		const base = selectedConversation || conversations[0];
+		const newConv = {
+			id: base.id,
+			conversationId: generateConversationId(),
+			name: base.name,
+			role: base.role,
+			lastMessage: "",
+			time: "",
+			unread: false,
+			messages: [],
+			callHistory: [],
+			isNew: true,
+		};
+		setConversations((prev: any[]) => [newConv, ...prev]);
+		setSelectedConversation(newConv);
+		setMessageInput("");
+		setCallState("idle");
+		setCallDuration(0);
+	};
+
 	const formatCallDuration = (seconds: number) => {
 		const mins = Math.floor(seconds / 60);
 		const secs = seconds % 60;
@@ -196,6 +349,11 @@ function Messages() {
 							onClick={() => {
 								setSelectedConversation(conv);
 								setCallState("idle");
+								if (conv.conversationId && !conv.isNew) {
+									loadMessagesForConversation(
+										String(conv.conversationId)
+									);
+								}
 							}}
 							className={`p-3 rounded-lg cursor-pointer transition-colors ${
 								selectedConversation.id === conv.id
@@ -243,21 +401,30 @@ function Messages() {
 				<div className="pb-4 border-b border-border mb-4 flex items-center justify-between">
 					<div>
 						<h2 className="text-2xl font-bold text-foreground">
-							{selectedConversation.name}
+							{selectedConversation ? selectedConversation.name : "Messages"}
 						</h2>
 						<p className="text-sm text-muted-foreground">
-							{selectedConversation.role}
+							{selectedConversation?.role || ""}
 						</p>
 					</div>
-					{callState === "idle" && (
+					<div className="flex items-center gap-2">
 						<Button
-							onClick={handleInitiateCall}
-							className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+							variant="outline"
+							onClick={handleNewChat}
+							disabled={!selectedConversation}
 						>
-							<span>📹</span>
-							Start Video Call
+							New Chat
 						</Button>
-					)}
+						{callState === "idle" && (
+							<Button
+								onClick={handleInitiateCall}
+								className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+							>
+								<span>📹</span>
+								Start Video Call
+							</Button>
+						)}
+					</div>
 				</div>
 
 				{/* In-Call Interface */}
@@ -360,69 +527,79 @@ function Messages() {
 
 				{/* Messages */}
 				<div className="flex-1 space-y-3 overflow-y-auto mb-4">
-					{selectedConversation.messages.map((msg, idx) => (
-						<div
-							key={idx}
-							className={`flex ${
-								msg.isUser ? "justify-end" : "justify-start"
-							}`}
-						>
+					{selectedConversation &&
+					selectedConversation.messages &&
+					selectedConversation.messages.length > 0 ? (
+						selectedConversation.messages.map((msg: any, idx: number) => (
 							<div
-								className={`max-w-xs p-3 rounded-lg ${
-									msg.isUser
-										? "bg-primary text-primary-foreground"
-										: "bg-muted text-foreground"
+								key={idx}
+								className={`flex ${
+									msg.isUser ? "justify-end" : "justify-start"
 								}`}
 							>
-								<p className="text-sm">{msg.text}</p>
-								<div className="flex items-center gap-1 mt-1">
-									<p className="text-xs opacity-70">
-										{msg.time}
-									</p>
-									{msg.isUser && (
-										<span className="text-xs opacity-70">
-											{msg.status === "sent"
-												? "✓"
-												: msg.status === "read"
-												? "✓✓"
-												: "..."}
-										</span>
+								<div
+									className={`max-w-xs p-3 rounded-lg ${
+										msg.isUser
+											? "bg-primary text-primary-foreground"
+											: "bg-muted text-foreground"
+									}`}
+								>
+									<p className="text-sm">{msg.text}</p>
+									<div className="flex items-center gap-1 mt-1">
+										<p className="text-xs opacity-70">
+											{msg.time}
+										</p>
+										{msg.isUser && (
+											<span className="text-xs opacity-70">
+												{msg.status === "sent"
+													? "✓"
+													: msg.status === "read"
+													? "✓✓"
+													: "..."}
+											</span>
+										)}
+									</div>
+								</div>
+							</div>
+						))
+					) : (
+						<div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">
+							No messages yet.
+						</div>
+					)}
+
+					{selectedConversation &&
+						selectedConversation.callHistory &&
+						selectedConversation.callHistory.length > 0 && (
+							<div className="mt-6 pt-4 border-t border-border">
+								<p className="text-xs font-semibold text-muted-foreground mb-3">
+									CALL HISTORY
+								</p>
+								<div className="space-y-2">
+									{selectedConversation.callHistory.map(
+										(call: any, idx: number) => (
+											<div
+												key={idx}
+												className="flex items-center gap-3 p-2 rounded bg-muted/50"
+											>
+												<span className="text-lg">📹</span>
+												<div className="flex-1 min-w-0">
+													<p className="text-sm font-medium text-foreground">
+														Video Call
+														</p>
+													<p className="text-xs text-muted-foreground">
+														{call.date}
+													</p>
+												</div>
+												<p className="text-sm font-medium text-foreground">
+													{call.duration}
+												</p>
+											</div>
+										)
 									)}
 								</div>
 							</div>
-						</div>
-					))}
-
-					{selectedConversation.callHistory.length > 0 && (
-						<div className="mt-6 pt-4 border-t border-border">
-							<p className="text-xs font-semibold text-muted-foreground mb-3">
-								CALL HISTORY
-							</p>
-							<div className="space-y-2">
-								{selectedConversation.callHistory.map(
-									(call, idx) => (
-										<div
-											key={idx}
-											className="flex items-center gap-3 p-2 rounded bg-muted/50"
-										>
-											<span className="text-lg">📹</span>
-											<div className="flex-1 min-w-0">
-												<p className="text-sm font-medium text-foreground">
-													Video Call
-												</p>
-												<p className="text-xs text-muted-foreground">
-													{call.date}
-												</p>
-											</div>
-											<p className="text-sm font-medium text-foreground">
-												{call.duration}
-											</p>
-										</div>
-									)
-								)}
-							</div>
-						</div>
-					)}
+						)}
 				</div>
 
 				{/* Input Area */}
@@ -436,11 +613,15 @@ function Messages() {
 							e.key === "Enter" && handleSendMessage()
 						}
 						className="flex-1 px-3 py-2 border border-border rounded-lg bg-input text-foreground"
-						disabled={callState !== "idle"}
+						disabled={!selectedConversation || callState !== "idle"}
 					/>
 					<Button
 						onClick={handleSendMessage}
-						disabled={!messageInput.trim() || callState !== "idle"}
+						disabled={
+							!selectedConversation ||
+							!messageInput.trim() ||
+							callState !== "idle"
+						}
 					>
 						Send
 					</Button>

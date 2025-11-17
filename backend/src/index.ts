@@ -1,5 +1,6 @@
 import connectDB from "./utils/db.js";
 import app from "./app.js";
+import { initSocket } from "./socket.js";
 
 connectDB()
 	.then(() => {
@@ -7,6 +8,9 @@ connectDB()
 		const server = app.listen(port, () => {
 			console.log(`Server running on port ${port}`);
 		});
+
+		// Initialize Socket.IO for real-time features
+		initSocket(server);
 
 		server.on("error", (error: Error) => {
 			console.error("Server error: ", error);

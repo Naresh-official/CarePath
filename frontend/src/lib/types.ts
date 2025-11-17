@@ -420,6 +420,7 @@ export interface Message {
 export interface SendMessageData {
 	receiverId: string;
 	text: string;
+	conversationId?: string;
 	attachments?: Array<{
 		type?: string;
 		url?: string;
