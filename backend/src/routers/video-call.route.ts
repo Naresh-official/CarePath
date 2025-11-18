@@ -5,6 +5,7 @@ import {
 	endCall,
 	getCallSession,
 	sendSignal,
+ 	getConsultationsForPatient,
 } from "../controllers/video-call.controller.js";
 
 const router = Router();
@@ -14,5 +15,6 @@ router.get("/join/:roomId", joinCallRoom);
 router.post("/end/:roomId", endCall);
 router.get("/session/:roomId", getCallSession);
 router.post("/signal", sendSignal);
+router.get("/consultations/:patientId", getConsultationsForPatient);
 
 export default router;

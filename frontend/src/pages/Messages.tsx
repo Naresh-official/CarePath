@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { messageApi, patientApi } from "@/lib/api";
+import { messageApi, patientApi, videoCallApi } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { Message as ApiMessage } from "@/lib/types";
 import { toast } from "sonner";
@@ -20,6 +20,10 @@ function Messages() {
 	const [selectedConversation, setSelectedConversation] = useState<any | null>(
 		null
 	);
+	const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+	const [incomingCall, setIncomingCall] = useState<
+		{ roomId: string; fromName?: string } | null
+	>(null);
 
 	const generateConversationId = () => {
 		return `${user?.id || "u"}-${Date.now()}-${Math.random()
@@ -68,9 +72,9 @@ function Messages() {
 							lastMessage: last?.text || "",
 							time: last?.createdAt
 								? new Date(last.createdAt).toLocaleTimeString([], {
-											hour: "2-digit",
-											minute: "2-digit",
-										})
+									hour: "2-digit",
+									minute: "2-digit",
+								})
 								: "",
 							unread: false,
 						};
@@ -152,9 +156,9 @@ function Messages() {
 						lastMessage: last?.text || "",
 						time: last?.createdAt
 							? new Date(last.createdAt).toLocaleTimeString([], {
-									hour: "2-digit",
-									minute: "2-digit",
-								})
+								hour: "2-digit",
+								minute: "2-digit",
+							})
 							: "",
 						unread: (conv.unreadCount || 0) > 0,
 						messages: [],
@@ -221,7 +225,7 @@ function Messages() {
 					selectedConversation &&
 					msgConversationId &&
 					String(selectedConversation.conversationId) ===
-						String(msgConversationId)
+					String(msgConversationId)
 				) {
 					loadMessagesForConversation(String(msgConversationId));
 				}
@@ -238,14 +242,46 @@ function Messages() {
 			}
 		};
 
+		const handleIncomingCall = (payload: {
+			roomId?: string;
+			fromUserId?: string;
+			fromName?: string;
+		}) => {
+			if (!payload?.roomId) return;
+			setIncomingCall({
+				roomId: payload.roomId,
+				fromName: payload.fromName,
+			});
+			setCallState("ringing");
+			setCallDuration(0);
+			toast.info(
+				`Incoming video call from ${payload.fromName || "your doctor"
+				}`
+			);
+		};
+
+		const handleVideoEnded = (payload: { roomId?: string }) => {
+			if (!payload?.roomId) return;
+			if (currentRoomId && payload.roomId === currentRoomId) {
+				setCallState("idle");
+				setCallDuration(0);
+				setCurrentRoomId(null);
+			}
+			setIncomingCall(null);
+		};
+
 		socket.on("message:new", handleNewMessage);
 		socket.on("message:read", handleMessageRead);
+		socket.on("video:incoming", handleIncomingCall);
+		socket.on("video:ended", handleVideoEnded);
 
 		return () => {
 			socket.off("message:new", handleNewMessage);
 			socket.off("message:read", handleMessageRead);
+			socket.off("video:incoming", handleIncomingCall);
+			socket.off("video:ended", handleVideoEnded);
 		};
-	}, [user, selectedConversation]);
+	}, [user, selectedConversation, currentRoomId]);
 
 	const handleSendMessage = async () => {
 		if (!messageInput.trim() || !selectedConversation) return;
@@ -271,15 +307,38 @@ function Messages() {
 		}
 	};
 
-	const handleInitiateCall = () => {
-		setCallState("ringing");
-		setCallDuration(0);
-		setTimeout(() => {
+	const handleAcceptCall = async () => {
+		if (!incomingCall) return;
+		try {
+			const { roomId } = incomingCall;
+			setCurrentRoomId(roomId);
+			// Open the in-app LiveKit-powered video call page
+			window.open(`/video-call/${roomId}`, "_blank", "noopener,noreferrer");
 			setCallState("connected");
-		}, 3000);
+			setIncomingCall(null);
+		} catch (error) {
+			toast.error("Failed to join video call");
+			setCallState("idle");
+			setCallDuration(0);
+			setCurrentRoomId(null);
+			setIncomingCall(null);
+		}
 	};
 
-	const handleEndCall = () => {
+	const handleDeclineCall = async () => {
+		if (!incomingCall) return;
+		const { roomId } = incomingCall;
+		setIncomingCall(null);
+		try {
+			await videoCallApi.endCall(roomId);
+		} catch {
+			// ignore API errors when declining
+		}
+		setCallState("idle");
+		setCallDuration(0);
+	};
+
+	const handleEndCall = async () => {
 		const updatedConversations = conversations.map((conv) => {
 			if (conv.id === selectedConversation.id) {
 				return {
@@ -303,8 +362,16 @@ function Messages() {
 		setSelectedConversation(
 			updatedConversations.find((c) => c.id === selectedConversation.id)!
 		);
+		if (currentRoomId) {
+			try {
+				await videoCallApi.endCall(currentRoomId);
+			} catch {
+				// ignore API errors when ending
+			}
+		}
 		setCallState("idle");
 		setCallDuration(0);
+		setCurrentRoomId(null);
 	};
 
 	const handleNewChat = () => {
@@ -345,7 +412,7 @@ function Messages() {
 				<div className="space-y-2 overflow-y-auto flex-1">
 					{conversations.map((conv) => (
 						<div
-							key={conv.id}
+							key={conv.conversationId}
 							onClick={() => {
 								setSelectedConversation(conv);
 								setCallState("idle");
@@ -355,18 +422,18 @@ function Messages() {
 									);
 								}
 							}}
-							className={`p-3 rounded-lg cursor-pointer transition-colors ${
-								selectedConversation.id === conv.id
+							className={`p-3 rounded-lg cursor-pointer transition-colors ${String(selectedConversation?.conversationId) ===
+									String(conv.conversationId)
 									? "bg-primary/10 border border-primary"
 									: "hover:bg-muted border border-transparent"
-							}`}
+								}`}
+
 						>
 							<div className="flex items-start justify-between gap-2">
 								<div className="flex-1 min-w-0">
 									<p
-										className={`font-medium text-foreground ${
-											conv.unread ? "font-bold" : ""
-										}`}
+										className={`font-medium text-foreground ${conv.unread ? "font-bold" : ""
+											}`}
 									>
 										{conv.name}
 									</p>
@@ -374,11 +441,10 @@ function Messages() {
 										{conv.role}
 									</p>
 									<p
-										className={`text-sm truncate mt-1 ${
-											conv.unread
+										className={`text-sm truncate mt-1 ${conv.unread
 												? "text-foreground font-medium"
 												: "text-muted-foreground"
-										}`}
+											}`}
 									>
 										{conv.lastMessage}
 									</p>
@@ -415,15 +481,6 @@ function Messages() {
 						>
 							New Chat
 						</Button>
-						{callState === "idle" && (
-							<Button
-								onClick={handleInitiateCall}
-								className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-							>
-								<span>📹</span>
-								Start Video Call
-							</Button>
-						)}
 					</div>
 				</div>
 
@@ -435,15 +492,33 @@ function Messages() {
 								<div>
 									<p className="font-semibold text-foreground">
 										{callState === "ringing"
-											? "Calling..."
+											? "Incoming video call"
 											: "Connected"}
 									</p>
 									<p className="text-sm text-muted-foreground">
 										{callState === "ringing"
-											? "Waiting for response..."
+											? incomingCall?.fromName ||
+											selectedConversation?.name ||
+											"Your doctor is calling you"
 											: formatCallDuration(callDuration)}
 									</p>
 								</div>
+								{callState === "ringing" && (
+									<div className="flex items-center gap-2">
+										<Button
+											onClick={handleAcceptCall}
+											className="bg-green-600 hover:bg-green-700 text-white"
+										>
+											Accept
+										</Button>
+										<Button
+											onClick={handleDeclineCall}
+											variant="outline"
+										>
+											Decline
+										</Button>
+									</div>
+								)}
 							</div>
 
 							{/* Video Preview Area */}
@@ -528,21 +603,19 @@ function Messages() {
 				{/* Messages */}
 				<div className="flex-1 space-y-3 overflow-y-auto mb-4">
 					{selectedConversation &&
-					selectedConversation.messages &&
-					selectedConversation.messages.length > 0 ? (
+						selectedConversation.messages &&
+						selectedConversation.messages.length > 0 ? (
 						selectedConversation.messages.map((msg: any, idx: number) => (
 							<div
 								key={idx}
-								className={`flex ${
-									msg.isUser ? "justify-end" : "justify-start"
-								}`}
+								className={`flex ${msg.isUser ? "justify-end" : "justify-start"
+									}`}
 							>
 								<div
-									className={`max-w-xs p-3 rounded-lg ${
-										msg.isUser
+									className={`max-w-xs p-3 rounded-lg ${msg.isUser
 											? "bg-primary text-primary-foreground"
 											: "bg-muted text-foreground"
-									}`}
+										}`}
 								>
 									<p className="text-sm">{msg.text}</p>
 									<div className="flex items-center gap-1 mt-1">
@@ -554,8 +627,8 @@ function Messages() {
 												{msg.status === "sent"
 													? "✓"
 													: msg.status === "read"
-													? "✓✓"
-													: "..."}
+														? "✓✓"
+														: "..."}
 											</span>
 										)}
 									</div>
@@ -585,8 +658,8 @@ function Messages() {
 												<span className="text-lg">📹</span>
 												<div className="flex-1 min-w-0">
 													<p className="text-sm font-medium text-foreground">
-														Video Call
-														</p>
+														Video consultation
+													</p>
 													<p className="text-xs text-muted-foreground">
 														{call.date}
 													</p>

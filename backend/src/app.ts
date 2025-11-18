@@ -11,9 +11,11 @@ const app: Express = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+const allowedURL = [process.env.FRONTEND_URL!,"http://10.169.189.210:5173"]
 app.use(
 	cors({
-		origin: process.env.FRONTEND_URL,
+		origin: allowedURL,
 		credentials: true,
 	})
 );
@@ -35,6 +37,7 @@ import {
 	authorizePatient,
 } from "./middlewares/authorization.middleware.js";
 import { authMiddleware } from "./middlewares/auth.middleware.js";
+import { CLIENT_RENEG_LIMIT } from "tls";
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/admin", authMiddleware, authorizeAdmin, adminRouter);

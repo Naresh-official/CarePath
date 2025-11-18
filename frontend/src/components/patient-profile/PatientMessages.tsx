@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { messageApi } from "@/lib/api";
+import { messageApi, videoCallApi } from "@/lib/api";
 import type { Patient, Message as ApiMessage } from "@/lib/types";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -54,6 +54,8 @@ function PatientMessages({ patient, activeTab }: PatientMessagesProps) {
 	const [conversations, setConversations] = useState<Conversation[]>([]);
 	const [selectedConversation, setSelectedConversation] =
 		useState<Conversation | null>(null);
+	const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+	const [consultations, setConsultations] = useState<CallHistory[]>([]);
 
 	const generateConversationId = () => {
 		return `${user?.id || "u"}-${Date.now()}-${Math.random()
@@ -225,6 +227,40 @@ function PatientMessages({ patient, activeTab }: PatientMessagesProps) {
 	}, [patient, user]);
 
 	useEffect(() => {
+		if (!patient || !user) return;
+
+		const fetchConsultations = async () => {
+			try {
+				const response = await videoCallApi.getConsultationsForPatient(
+					patient._id
+				);
+				const raw = (
+					(response.data.data as Record<string, unknown>)
+						?.consultations || []
+				) as Array<{
+					startTime: string;
+					endTime?: string;
+					duration?: number;
+					status: string;
+				}>;
+
+				const mapped: CallHistory[] = raw.map((c) => ({
+					type: "video",
+					date: new Date(c.startTime).toLocaleString(),
+					duration: formatCallDuration(c.duration || 0),
+					status: c.status,
+				}));
+
+				setConsultations(mapped);
+			} catch {
+				// ignore fetch errors for now
+			}
+		};
+
+		fetchConsultations();
+	}, [patient, user]);
+
+	useEffect(() => {
 		if (!user || !patient) return;
 		const socket = getSocket();
 
@@ -303,15 +339,44 @@ function PatientMessages({ patient, activeTab }: PatientMessagesProps) {
 		}
 	};
 
-	const handleInitiateCall = () => {
-		setCallState("ringing");
-		setCallDuration(0);
-		setTimeout(() => {
+	const handleInitiateCall = async () => {
+		if (!user || String(user.role).toLowerCase() !== "doctor") {
+			toast.error("Only doctors can start a video call");
+			return;
+		}
+		if (!patient?.userId?._id) {
+			toast.error("Patient information is missing");
+			return;
+		}
+
+		try {
+			setCallState("ringing");
+			setCallDuration(0);
+			const response = await videoCallApi.createRoom({
+				participantId: patient.userId._id,
+			});
+			const payload = response.data.data as { roomId?: string };
+			const roomId = payload?.roomId;
+
+			if (!roomId) {
+				setCallState("idle");
+				toast.error("Failed to create video call room");
+				return;
+			}
+
+			setCurrentRoomId(roomId);
+			// Open the in-app LiveKit-powered video call page
+			window.open(`/video-call/${roomId}`, "_blank", "noopener,noreferrer");
+			
 			setCallState("connected");
-		}, 3000);
+		} catch (error) {
+			setCallState("idle");
+			setCurrentRoomId(null);
+			toast.error("Failed to start video call");
+		}
 	};
 
-	const handleEndCall = () => {
+	const handleEndCall = async () => {
 		if (!selectedConversation) return;
 
 		const updatedConversations = conversations.map((conv) => {
@@ -337,8 +402,31 @@ function PatientMessages({ patient, activeTab }: PatientMessagesProps) {
 		setSelectedConversation(
 			updatedConversations.find((c) => c.id === selectedConversation.id)!
 		);
+
+		// Update persisted consultations locally so the doctor sees the new entry immediately
+		setConsultations((prev) => [
+			{
+				type: "video",
+				duration: `${Math.floor(callDuration / 60)}:${String(
+					callDuration % 60
+				).padStart(2, "0")}`,
+				date: new Date().toLocaleString(),
+				status: "completed",
+			},
+			...prev,
+		]);
+
+		if (currentRoomId) {
+			try {
+				await videoCallApi.endCall(currentRoomId);
+			} catch {
+				// ignore API errors when ending call
+			}
+		}
+
 		setCallState("idle");
 		setCallDuration(0);
+		setCurrentRoomId(null);
 	};
 
 	const handleNewChat = () => {
@@ -633,38 +721,31 @@ function PatientMessages({ patient, activeTab }: PatientMessagesProps) {
 								</div>
 							</Card>
 						)}
-						{selectedConversation &&
-							selectedConversation.callHistory &&
-							selectedConversation.callHistory.length > 0 && (
+						{consultations &&
+							consultations.length > 0 && (
 								<div>
 									<p className="text-xs font-semibold text-muted-foreground mb-2">
 										Call history
 									</p>
 									<div className="space-y-2">
-										{selectedConversation.callHistory.map(
-											(
-												call: CallHistory,
-												idx: number
-											) => (
-												<div
-													key={idx}
-													className="flex items-center gap-3 p-2 rounded bg-muted/50"
-												>
-													<span className="text-lg">
-														📹
-													</span>
-													<div className="flex-1 min-w-0">
-														<p className="text-sm font-medium text-foreground">
-															Video Call
-														</p>
-														<p className="text-xs text-muted-foreground">
-															{call.date} •{" "}
-															{call.duration}
-														</p>
-													</div>
+										{consultations.map((call: CallHistory, idx: number) => (
+											<div
+												key={idx}
+												className="flex items-center gap-3 p-2 rounded bg-muted/50"
+											>
+												<span className="text-lg">
+													📹
+												</span>
+												<div className="flex-1 min-w-0">
+													<p className="text-sm font-medium text-foreground">
+														Video consultation
+													</p>
+													<p className="text-xs text-muted-foreground">
+														{call.date} • {call.duration}
+													</p>
 												</div>
-											)
-										)}
+											</div>
+										))}
 									</div>
 								</div>
 							)}

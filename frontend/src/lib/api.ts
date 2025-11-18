@@ -260,6 +260,8 @@ export const videoCallApi = {
 	endCall: (roomId: string) => api.post(`/video-call/end/${roomId}`),
 	getSession: (roomId: string) => api.get(`/video-call/session/${roomId}`),
 	sendSignal: (data: VideoCallSignal) => api.post("/video-call/signal", data),
+	getConsultationsForPatient: (patientId: string) =>
+		api.get(`/video-call/consultations/${patientId}`),
 };
 
 export default api;
