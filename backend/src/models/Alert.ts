@@ -27,7 +27,8 @@ export interface IAlert extends Document {
 			| "medication"
 			| "task"
 			| "manual"
-			| "system";
+			| "system"
+			| "doctor-review";
 		referenceId?: mongoose.Types.ObjectId;
 	};
 	assignedTo?: mongoose.Types.ObjectId;
@@ -84,6 +85,7 @@ const alertSchema = new Schema<IAlert>(
 					"task",
 					"manual",
 					"system",
+					"doctor-review",
 				],
 			},
 			referenceId: {

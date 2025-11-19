@@ -79,6 +79,7 @@ export const addPatient = asyncHandler(async (req: Request, res: Response) => {
 		procedure,
 		procedureDate,
 		riskLevel,
+		monitoringDays,
 	} = req.body;
 
 	validateRequest([
@@ -145,6 +146,7 @@ export const addPatient = asyncHandler(async (req: Request, res: Response) => {
 		procedure,
 		procedureDate: new Date(procedureDate),
 		riskLevel: riskLevel || "stable",
+		monitoringDays: monitoringDays || 7,
 	});
 
 	return res.sendResponse({
@@ -177,6 +179,7 @@ export const updatePatient = asyncHandler(
 			adherenceRate,
 			recoveryProgress,
 			status,
+			monitoringDays,
 		} = req.body;
 
 		const patient = await Patient.findById(patientId).populate("userId");
@@ -198,6 +201,8 @@ export const updatePatient = asyncHandler(
 		if (recoveryProgress !== undefined)
 			updateData.recoveryProgress = recoveryProgress;
 		if (status) updateData.status = status;
+		if (monitoringDays !== undefined)
+			(updateData as any).monitoringDays = monitoringDays;
 
 		const updatedPatient = await Patient.findByIdAndUpdate(
 			patientId,

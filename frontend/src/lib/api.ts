@@ -19,6 +19,8 @@ import type {
 	VideoCallSignal,
 	AssignExerciseData,
 	UpdateExerciseData,
+	CreateFollowUpConsultationData,
+	UpdateFollowUpConsultationData,
 } from "./types";
 
 const API_BASE_URL =
@@ -50,6 +52,13 @@ export const authApi = {
 	login: (data: LoginData) => api.post("/auth/login", data),
 	logout: () => api.post("/auth/logout"),
 	getCurrentUser: () => api.get("/auth/me"),
+	updateProfile: (data: {
+		firstName?: string;
+		lastName?: string;
+		email?: string;
+		currentPassword?: string;
+		newPassword?: string;
+	}) => api.patch("/auth/profile", data),
 };
 
 // ==================== PATIENT API ====================
@@ -149,6 +158,9 @@ export const doctorApi = {
 
 	// Analytics
 	getAnalytics: () => api.get("/doctor/analytics"),
+	getPatientAdherence: (patientId: string, params?: { startDate?: string; endDate?: string }) =>
+		api.get(`/doctor/adherence/${patientId}`, { params }),
+	getAdherenceAnalytics: () => api.get("/doctor/adherence-analytics"),
 
 	// Check-ins (Doctor can view patient check-ins)
 	getCheckIns: (patientId: string) =>
@@ -159,6 +171,22 @@ export const doctorApi = {
 		patientId: string,
 		riskLevel: "stable" | "monitor" | "critical"
 	) => api.patch(`/doctor/patient/${patientId}/risk-level`, { riskLevel }),
+	updatePatientMonitoringDuration: (patientId: string, monitoringDays: number) =>
+		api.patch(`/doctor/patient/${patientId}/monitoring-duration`, {
+			monitoringDays,
+		}),
+
+	// Follow-up Consultations
+	createFollowUpConsultation: (data: CreateFollowUpConsultationData) =>
+		api.post("/doctor/follow-up", data),
+	getPatientFollowUpConsultations: (patientId: string, params?: { status?: string }) =>
+		api.get(`/doctor/follow-ups/${patientId}`, { params }),
+	getFollowUpConsultationById: (followUpId: string) =>
+		api.get(`/doctor/follow-up/${followUpId}`),
+	updateFollowUpConsultation: (followUpId: string, data: UpdateFollowUpConsultationData) =>
+		api.patch(`/doctor/follow-up/${followUpId}`, data),
+	deleteFollowUpConsultation: (followUpId: string) =>
+		api.delete(`/doctor/follow-up/${followUpId}`),
 };
 
 // ==================== ADMIN API ====================

@@ -36,14 +36,9 @@ function Hero() {
 					{/* Hero Image */}
 					<div className="relative z-0">
 						<img
-							src="https://placehold.co/600x500/e0f2fe/0284c7?text=Patient+App+on+Phone+%26%0ADoctor+Dashboard+on+Desktop"
-							alt="CarePath app on phone and desktop"
+							src="/doctor-dashboard.png"
+							alt="Doctor Dashboard"
 							className="rounded-2xl shadow-2xl object-cover"
-							onError={(e) => {
-								e.target.onerror = null;
-								e.target.src =
-									"https://placehold.co/600x500/e0f2fe/333333?text=App+Preview";
-							}}
 						/>
 					</div>
 				</div>

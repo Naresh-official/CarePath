@@ -58,6 +58,8 @@ interface ApiAssignedPatient {
 		isActive: boolean;
 		id: string; // This is the actual patient ID
 	};
+	procedure: string;
+	procedureDate: string;
 }
 
 interface ApiUnassignedPatient {
@@ -129,8 +131,8 @@ export default function AssignmentMatrix() {
 					assignment.patients.map((p) => ({
 						id: p.userId.id, // actual patient ID
 						name: p.userId.fullName,
-						procedure: "N/A", // backend no longer sends this
-						procedureDate: "", // backend no longer sends this
+						procedure: p.procedure || "N/A",
+						procedureDate: p.procedureDate || "",
 						assignedTo: assignment.doctor._id,
 						assignedDate: p.assignedDate,
 						assignmentId: p.assignmentId,
@@ -321,6 +323,15 @@ export default function AssignmentMatrix() {
 																		}
 																	</Badge>
 																</div>
+																{patient.procedureDate && (
+																	<p className="text-xs text-muted-foreground">
+																		Procedure
+																		Date:{" "}
+																		{formatDate(
+																			patient.procedureDate
+																		)}
+																	</p>
+																)}
 																<p className="text-xs text-muted-foreground">
 																	Assigned:{" "}
 																	{formatDate(

@@ -60,8 +60,6 @@ export const submitSymptomCheckIn = asyncHandler(
 		]);
 
 		const patient = await Patient.findOne({ userId });
-
-		console.log(patient);
 		if (!patient) {
 			throw new ApiError("Patient not found", 404);
 		}
@@ -142,8 +140,6 @@ export const submitSymptomCheckIn = asyncHandler(
 			checkInDate: new Date(),
 		});
 
-		console.log(checkIn);
-
 		// Create basic completion alert
 		await Alert.create({
 			patientId: patient._id,
@@ -167,6 +163,67 @@ export const submitSymptomCheckIn = asyncHandler(
 	}
 );
 
+// Update patient monitoring duration (in days) by doctor
+export const updatePatientMonitoringDuration = asyncHandler(
+	async (req: Request, res: Response) => {
+		const { patientId } = req.params;
+		const { monitoringDays } = req.body;
+		const userId = req.user?.id;
+
+		if (!userId) {
+			throw new ApiError("Doctor not authenticated", 401);
+		}
+
+		const doctor = await Doctor.findOne({ userId: userId });
+
+		if (!doctor) {
+			throw new ApiError("Doctor not found", 404);
+		}
+
+		validateRequest([
+			{
+				field: "monitoringDays",
+				value: monitoringDays,
+				rules: {
+					required: true,
+					type: "number",
+					min: 1,
+				},
+			},
+		]);
+
+		// Verify doctor has access to this patient
+		const assignment = await Assignment.findOne({
+			doctorId: doctor._id,
+			patientId,
+			status: { $ne: "inactive" },
+		});
+
+		if (!assignment) {
+			throw new ApiError("You do not have access to this patient", 403);
+		}
+
+		const patient = await Patient.findById(patientId);
+
+		if (!patient) {
+			throw new ApiError("Patient not found", 404);
+		}
+
+		patient.monitoringDays = Number(monitoringDays);
+		await patient.save();
+
+		return res.sendResponse({
+			statusCode: 200,
+			success: true,
+			message: "Patient monitoring duration updated successfully",
+			data: {
+				patientId,
+				monitoringDays: patient.monitoringDays,
+			},
+		});
+	}
+);
+
 // Get all check-ins for a patient
 export const getPatientCheckIns = asyncHandler(
 	async (req: Request, res: Response) => {
@@ -175,7 +232,7 @@ export const getPatientCheckIns = asyncHandler(
 		const patient = await Patient.findOne({ userId: patientId });
 
 		const checkIns = await SymptomCheckIn.find({
-			patientId: patient?._id as string,
+			patientId: patient?._id,
 		});
 
 		return res.sendResponse({
@@ -325,7 +382,7 @@ export const getDoctorPatientCheckIns = asyncHandler(
 		// Get all patients assigned to this doctor
 		const assignments = await Assignment.find({
 			doctorId: doctor._id,
-			status: "active",
+			status: { $ne: "inactive" },
 		});
 		const patientIds = assignments.map((a) => a.patientId);
 
@@ -438,7 +495,7 @@ export const getDoctorPatientRecoveryTrends = asyncHandler(
 		const assignment = await Assignment.findOne({
 			doctorId: doctor._id,
 			patientId,
-			status: "active",
+			status: { $ne: "inactive" },
 		});
 
 		if (!assignment) {
@@ -566,7 +623,7 @@ export const getDoctorCheckInById = asyncHandler(
 		const assignment = await Assignment.findOne({
 			doctorId: doctor._id,
 			patientId: checkIn.patientId,
-			status: "active",
+			status: { $ne: "inactive" },
 		});
 
 		if (!assignment) {
@@ -666,7 +723,7 @@ export const updatePatientRiskLevel = asyncHandler(
 		const assignment = await Assignment.findOne({
 			doctorId: doctor._id,
 			patientId,
-			status: "active",
+			status: { $ne: "inactive" },
 		});
 
 		if (!assignment) {

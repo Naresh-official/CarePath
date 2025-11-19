@@ -16,6 +16,7 @@ export interface IPatient extends Document {
 	riskLevel: "stable" | "monitor" | "critical";
 	adherenceRate: number;
 	recoveryProgress: number;
+	monitoringDays: number;
 	daysPostOp: number;
 	status: "active" | "recovered" | "inactive";
 	createdAt: Date;
@@ -72,6 +73,11 @@ const patientSchema = new Schema<IPatient>(
 			default: 0,
 			min: 0,
 			max: 100,
+		},
+		monitoringDays: {
+			type: Number,
+			default: 7,
+			min: 1,
 		},
 		status: {
 			type: String,

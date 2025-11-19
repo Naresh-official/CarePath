@@ -111,3 +111,74 @@ export const getCurrentUser = asyncHandler(
 		});
 	}
 );
+
+export const updateProfile = asyncHandler(
+	async (req: Request, res: Response) => {
+		const userId = req.user?.id;
+		if (!userId) {
+			throw new ApiError("User not authenticated", 401);
+		}
+
+		const { firstName, lastName, email, currentPassword, newPassword } =
+			req.body;
+
+		// Get user with password to verify current password if changing password
+		const user = await User.findById(userId).select("+password");
+		if (!user) {
+			throw new ApiError("User not found", 404);
+		}
+
+		// If changing password, verify current password
+		if (newPassword) {
+			if (!currentPassword) {
+				throw new ApiError(
+					"Current password is required to change password",
+					400
+				);
+			}
+			const isPasswordValid = await user.comparePassword(currentPassword);
+			if (!isPasswordValid) {
+				throw new ApiError("Current password is incorrect", 400);
+			}
+			user.password = newPassword; // Will be hashed by pre-save hook
+		}
+
+		// Update email if provided
+		if (email !== undefined) {
+			// Check if email is already taken by another user
+			const existingUser = await User.findOne({
+				email,
+				_id: { $ne: userId },
+			});
+			if (existingUser) {
+				throw new ApiError("Email is already taken", 400);
+			}
+			user.email = email;
+		}
+
+		// Update name if provided
+		if (firstName !== undefined) {
+			user.firstName = firstName;
+		}
+		if (lastName !== undefined) {
+			user.lastName = lastName;
+		}
+
+		await user.save();
+
+		// Return updated user without password
+		const updatedUser = await User.findById(userId);
+
+		return res.sendResponse({
+			statusCode: 200,
+			success: true,
+			message: "Profile updated successfully",
+			data: {
+				id: updatedUser!._id,
+				email: updatedUser!.email,
+				role: updatedUser!.role,
+				name: updatedUser!.fullName,
+			},
+		});
+	}
+);

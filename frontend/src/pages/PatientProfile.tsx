@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Dialog,
 	DialogContent,
@@ -23,6 +25,7 @@ import type {
 	ExerciseTask,
 	SymptomCheckIn,
 	Message as ApiMessage,
+	FollowUpConsultation,
 } from "@/lib/types";
 import PatientProfileHeader from "@/components/patient-profile/PatientProfileHeader";
 import PatientOverview from "@/components/patient-profile/PatientOverview";
@@ -30,6 +33,7 @@ import MedicationManagement from "@/components/patient-profile/MedicationManagem
 import TaskManagement from "@/components/patient-profile/TaskManagement";
 import ExerciseManagement from "@/components/patient-profile/ExerciseManagement";
 import PatientMessages from "@/components/patient-profile/PatientMessages";
+import FollowUpConsultations from "@/components/patient-profile/FollowUpConsultations";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
 import { useAuth } from "@/context/AuthContext";
@@ -45,6 +49,7 @@ function PatientProfile() {
 		| "checkins"
 		| "medications"
 		| "tasks"
+		| "followups"
 		| "exercises"
 		| "messages"
 	>("overview");
@@ -52,6 +57,9 @@ function PatientProfile() {
 	const [patient, setPatient] = useState<Patient | null>(null);
 	const [medications, setMedications] = useState<Medication[]>([]);
 	const [tasks, setTasks] = useState<Task[]>([]);
+	const [followUpConsultations, setFollowUpConsultations] = useState<
+		FollowUpConsultation[]
+	>([]);
 	const [exercises, setExercises] = useState<ExerciseTask[]>([]);
 	const [checkIns, setCheckIns] = useState<SymptomCheckIn[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -66,12 +74,20 @@ function PatientProfile() {
 		"stable" | "monitor" | "critical"
 	>("stable");
 	const [updatingRisk, setUpdatingRisk] = useState(false);
+	const [monitoringDaysInput, setMonitoringDaysInput] = useState("");
+	const [updatingMonitoring, setUpdatingMonitoring] = useState(false);
 
 	const fetchPatientData = useCallback(async () => {
 		try {
 			setLoading(true);
 			const response = await patientApi.getPatientDetails(patientId!);
-			setPatient(response.data.data);
+			const fetchedPatient = response.data.data as Patient;
+			setPatient(fetchedPatient);
+			setMonitoringDaysInput(
+				fetchedPatient.monitoringDays !== undefined
+					? String(fetchedPatient.monitoringDays)
+					: "7"
+			);
 		} catch (err: unknown) {
 			console.error("Error fetching patient:", err);
 			setError(
@@ -100,6 +116,17 @@ function PatientProfile() {
 			setTasks(response.data.data || []);
 		} catch (err: unknown) {
 			console.error("Error fetching tasks:", err);
+		}
+	}, [patientId]);
+
+	const fetchFollowUpConsultations = useCallback(async () => {
+		try {
+			const response = await doctorApi.getPatientFollowUpConsultations(
+				patientId!
+			);
+			setFollowUpConsultations(response.data.data || []);
+		} catch (err: unknown) {
+			console.error("Error fetching follow-up consultations:", err);
 		}
 	}, [patientId]);
 
@@ -176,6 +203,31 @@ function PatientProfile() {
 						"Failed to mark as reviewed"
 				);
 			}
+		}
+	};
+
+	const handleUpdateMonitoringDuration = async () => {
+		if (!patientId) return;
+		const value = Number(monitoringDaysInput);
+		if (!value || value < 1) {
+			toast.error("Monitoring duration must be at least 1 day");
+			return;
+		}
+
+		try {
+			setUpdatingMonitoring(true);
+			await doctorApi.updatePatientMonitoringDuration(patientId, value);
+			toast.success("Monitoring duration updated");
+			fetchPatientData();
+		} catch (error) {
+			if (isAxiosError(error)) {
+				toast.error(
+					error.response?.data?.message ||
+						"Failed to update monitoring duration"
+				);
+			}
+		} finally {
+			setUpdatingMonitoring(false);
 		}
 	};
 
@@ -256,6 +308,7 @@ function PatientProfile() {
 		fetchPatientData();
 		fetchMedications();
 		fetchTasks();
+		fetchFollowUpConsultations();
 		fetchExercises();
 		fetchCheckIns();
 	}, [
@@ -263,6 +316,7 @@ function PatientProfile() {
 		fetchPatientData,
 		fetchMedications,
 		fetchTasks,
+		fetchFollowUpConsultations,
 		fetchExercises,
 		fetchCheckIns,
 	]);
@@ -298,6 +352,37 @@ function PatientProfile() {
 	return (
 		<div className="p-4 md:p-6 space-y-6">
 			<PatientProfileHeader patient={patient} />
+			<Card className="p-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+				<div>
+					<p className="text-sm text-muted-foreground">
+						Monitoring Duration
+					</p>
+					<p className="text-sm text-foreground">
+						Currently monitoring for {patient.monitoringDays ?? 7} days
+					</p>
+				</div>
+				<div className="flex flex-col md:flex-row gap-2 md:items-end">
+					<div className="space-y-1">
+						<Label htmlFor="monitoringDays">Monitoring days</Label>
+						<Input
+							id="monitoringDays"
+							type="number"
+							min={1}
+							value={monitoringDaysInput}
+							onChange={(e) => setMonitoringDaysInput(e.target.value)}
+							className="w-32"
+						/>
+					</div>
+					<Button
+						onClick={handleUpdateMonitoringDuration}
+						disabled={updatingMonitoring}
+					>
+						{updatingMonitoring
+							? "Updating..."
+							: "Update Monitoring"}
+					</Button>
+				</div>
+			</Card>
 
 			{/* Tabs */}
 			<div className="flex gap-2 border-b border-border overflow-x-auto">
@@ -307,6 +392,7 @@ function PatientProfile() {
 						"checkins",
 						"medications",
 						"tasks",
+						"followups",
 						"exercises",
 						"messages",
 					] as const
@@ -322,6 +408,8 @@ function PatientProfile() {
 					>
 						{tab === "checkins" ? (
 							"Check-Ins"
+						) : tab === "followups" ? (
+							"Follow-up Visits"
 						) : tab === "messages" ? (
 							<span className="inline-flex items-center gap-2">
 								<span>Messages</span>
@@ -533,6 +621,13 @@ function PatientProfile() {
 						patientId={patientId!}
 						tasks={tasks}
 						onUpdate={fetchTasks}
+					/>
+				)}
+				{activeTab === "followups" && (
+					<FollowUpConsultations
+						patientId={patientId!}
+						appointments={followUpConsultations}
+						onUpdate={fetchFollowUpConsultations}
 					/>
 				)}
 				{activeTab === "exercises" && (

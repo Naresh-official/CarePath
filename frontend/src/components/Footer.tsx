@@ -6,6 +6,7 @@ function Footer() {
 					{/* Logo & Copyright */}
 					<div className="col-span-2 lg:col-span-2">
 						<a href="#" className="flex items-center space-x-2">
+							<img src="/icon.jpg" alt="" className="w-10 rounded-xl" />
 							<span className="text-2xl font-bold text-white">
 								CarePath
 							</span>

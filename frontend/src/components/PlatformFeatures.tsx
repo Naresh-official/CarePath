@@ -74,28 +74,18 @@ function PlatformFeatures() {
 						</ul>
 					</div>
 					<img
-						src="https://placehold.co/600x450/e0f2fe/0284c7?text=Patient+App+%22Today+View%22"
+						src="/patient-home.png"
 						alt="Patient App"
 						className="rounded-xl shadow-2xl"
-						onError={(e) => {
-							e.target.onerror = null;
-							e.target.src =
-								"https://placehold.co/600x450/e0f2fe/333333?text=Patient+View";
-						}}
 					/>
 				</div>
 
 				{/* Feature 2: Clinical Monitoring */}
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-20">
 					<img
-						src="https://placehold.co/600x450/e0f2fe/0284c7?text=Doctor+Triage+Dashboard"
+						src="/doctor-dashboard.png"
 						alt="Doctor Dashboard"
 						className="rounded-xl shadow-2xl md:order-last"
-						onError={(e) => {
-							e.target.onerror = null;
-							e.target.src =
-								"https://placehold.co/600x450/e0f2fe/333333?text=Doctor+View";
-						}}
 					/>
 					<div>
 						<span className="inline-block px-4 py-1.5 bg-green-100 text-green-700 font-semibold text-sm rounded-full mb-4">
@@ -181,28 +171,18 @@ function PlatformFeatures() {
 						</ul>
 					</div>
 					<img
-						src="https://placehold.co/600x450/fff7e0/ca8a04?text=Telehealth+Call+%26%0APDF+Report+Icon"
+						src="/report.png"
 						alt="Telehealth and Reports"
 						className="rounded-xl shadow-2xl"
-						onError={(e) => {
-							e.target.onerror = null;
-							e.target.src =
-								"https://placehold.co/600x450/fff7e0/333333?text=Integrated+Tools";
-						}}
 					/>
 				</div>
 
 				{/* Feature 4: NEW Admin Portal */}
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
 					<img
-						src="https://placehold.co/600x450/f3e8ff/7e22ce?text=Administrator+Portal%0AUser+Management"
+						src="/admin.png"
 						alt="Admin Portal"
 						className="rounded-xl shadow-2xl md:order-last"
-						onError={(e) => {
-							e.target.onerror = null;
-							e.target.src =
-								"https://placehold.co/600x450/f3e8ff/333333?text=Admin+View";
-						}}
 					/>
 					<div>
 						<span className="inline-block px-4 py-1.5 bg-purple-100 text-purple-700 font-semibold text-sm rounded-full mb-4">

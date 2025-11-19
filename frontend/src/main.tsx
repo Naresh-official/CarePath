@@ -16,6 +16,7 @@ import PatientCheckIn from "./pages/PatientCheckIn.tsx";
 import PatientResources from "./pages/PatientResources.tsx";
 import Messages from "./pages/Messages.tsx";
 import PatientHealthReport from "./pages/PatientHealthReport.tsx";
+import PatientProfileSettings from "./pages/PatientProfileSettings.tsx";
 import DoctorDashboard from "./pages/DoctorDashboard.tsx";
 import PatientProfile from "./pages/PatientProfile.tsx";
 import Alerts from "./pages/Alerts.tsx";
@@ -52,6 +53,7 @@ const router = createBrowserRouter([
 					{ path: "resources", element: <PatientResources /> },
 					{ path: "messages", element: <Messages /> },
 					{ path: "reports", element: <PatientHealthReport /> },
+					{ path: "profile", element: <PatientProfileSettings /> },
 				],
 			},
 			{

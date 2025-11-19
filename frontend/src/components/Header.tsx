@@ -35,6 +35,7 @@ function Header() {
 			<nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-20">
 				{/* Logo */}
 				<a href="#" className="flex items-center space-x-2">
+				<img src="/icon.jpg" alt="" className="w-10 rounded-xl" />
 					<span className="text-2xl font-bold text-gray-900">
 						CarePath
 					</span>

@@ -67,6 +67,7 @@ export interface Patient {
 	status: "active" | "recovered";
 	age: number;
 	daysPostOp: number;
+	monitoringDays?: number;
 }
 
 export interface AddPatientData {
@@ -246,6 +247,53 @@ export interface UpdateTaskData {
 	description?: string;
 	scheduledTime?: string;
 	priority?: "low" | "medium" | "high";
+}
+
+// ==================== Follow-up Consultation Types ====================
+export interface FollowUpConsultation {
+	_id: string;
+	patientId: string | {
+		_id: string;
+		procedure: string;
+		procedureDate: string;
+	};
+	doctorId: string | {
+		_id: string;
+		userId: {
+			_id: string;
+			firstName: string;
+			lastName: string;
+		};
+	};
+	title: string;
+	description?: string;
+	scheduledTime: string;
+	priority: "low" | "medium" | "high";
+	location?: string;
+	status: "scheduled" | "completed" | "cancelled";
+	completedAt?: string;
+	notes?: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface CreateFollowUpConsultationData {
+	patientId: string;
+	title: string;
+	description?: string;
+	scheduledTime: string;
+	priority?: "low" | "medium" | "high";
+	location?: string;
+}
+
+export interface UpdateFollowUpConsultationData {
+	title?: string;
+	description?: string;
+	scheduledTime?: string;
+	priority?: "low" | "medium" | "high";
+	location?: string;
+	status?: "scheduled" | "completed" | "cancelled";
+	notes?: string;
 }
 
 export interface TaskStats {
@@ -483,6 +531,7 @@ export interface PatientAnalytics {
 		riskLevel: string;
 		status: string;
 		daysPostOp: number;
+		monitoringDays: number;
 	};
 	stats: {
 		totalCheckIns: number;

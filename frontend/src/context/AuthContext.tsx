@@ -28,7 +28,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 	const fetchUser = async () => {
 		try {
 			const { data } = await authApi.getCurrentUser();
-			console.log(data);
 			if (data.success) setUser(data.data);
 		} catch (err: unknown) {
 			setUser(null);
@@ -37,7 +36,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 		}
 	};
 
-	const PUBLIC_ROUTES = ["/", "/login", "/access-denied"];
+	const PUBLIC_ROUTES = ["/login", "/access-denied"];
 
 	useEffect(() => {
 		const currentPath = window.location.pathname;

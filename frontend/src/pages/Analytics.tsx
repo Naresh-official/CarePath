@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { doctorApi } from "@/lib/api";
+import { toast } from "sonner";
 
 // Metric Card Component
 function MetricCard({
@@ -61,90 +63,138 @@ function Analytics() {
 	const [timePeriod, setTimePeriod] = useState<"week" | "month" | "quarter">(
 		"month"
 	);
+	const [loading, setLoading] = useState(true);
+	const [analyticsData, setAnalyticsData] = useState<any>(null);
+	const [adherenceData, setAdherenceData] = useState<any>(null);
 
-	const analyticsData = {
-		month: {
-			readmissionRate: 8.2,
-			readmissionTrend: -12,
-			erVisitReduction: 34,
-			erVisitTrend: 5,
-			avgLengthOfStay: 3.2,
-			lossTrend: -0.5,
-			adherence: 89,
-			adherenceTrend: 3,
-			totalPatients: 47,
-			recoveredPatients: 42,
-			activeAlerts: 3,
-			completedCheckIns: 156,
-		},
-		week: {
-			readmissionRate: 7.8,
-			readmissionTrend: -5,
-			erVisitReduction: 31,
-			erVisitTrend: 2,
-			avgLengthOfStay: 3.1,
-			lossTrend: -0.2,
-			adherence: 87,
-			adherenceTrend: 1,
-			totalPatients: 47,
-			recoveredPatients: 40,
-			activeAlerts: 3,
-			completedCheckIns: 42,
-		},
-		quarter: {
-			readmissionRate: 8.5,
-			readmissionTrend: -18,
-			erVisitReduction: 36,
-			erVisitTrend: 8,
-			avgLengthOfStay: 3.4,
-			lossTrend: -0.8,
-			adherence: 91,
-			adherenceTrend: 5,
-			totalPatients: 47,
-			recoveredPatients: 44,
-			activeAlerts: 3,
-			completedCheckIns: 468,
-		},
+	useEffect(() => {
+		const fetchData = async () => {
+			try {
+				setLoading(true);
+				const [analyticsRes, adherenceRes] = await Promise.all([
+					doctorApi.getAnalytics(),
+					doctorApi.getAdherenceAnalytics(),
+				]);
+
+				setAnalyticsData(analyticsRes.data.data);
+				setAdherenceData(adherenceRes.data.data);
+			} catch (err: unknown) {
+				console.error("Error fetching analytics:", err);
+				toast.error(
+					(err as { response?: { data?: { message?: string } } }).response
+						?.data?.message || "Failed to load analytics"
+				);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchData();
+	}, []);
+
+	if (loading) {
+		return (
+			<div className="p-4 md:p-6">
+				<p className="text-muted-foreground">Loading analytics...</p>
+			</div>
+		);
+	}
+
+	if (!analyticsData || !adherenceData) {
+		return (
+			<div className="p-4 md:p-6">
+				<p className="text-red-600">Failed to load analytics data</p>
+			</div>
+		);
+	}
+
+	// Calculate date range based on time period
+	const now = new Date();
+	const startDate = new Date();
+	if (timePeriod === "week") {
+		startDate.setDate(now.getDate() - 7);
+	} else if (timePeriod === "month") {
+		startDate.setMonth(now.getMonth() - 1);
+	} else {
+		startDate.setMonth(now.getMonth() - 3);
+	}
+
+	const data = {
+		adherence: adherenceData.summary?.avgAdherence || 0,
+		adherenceTrend: 0, // Can be calculated from historical data
+		totalPatients: analyticsData.totalAssignedPatients || 0,
+		recoveredPatients: analyticsData.assignedPatients?.filter(
+			(p: any) => p.status === "recovered"
+		).length || 0,
+		activeAlerts: analyticsData.activeAlerts || 0,
+		completedCheckIns: 0, // Can be calculated from check-ins
 	};
 
-	const data = analyticsData[timePeriod];
+	// Group patients by procedure and calculate metrics
+	const procedureMap = new Map<string, any[]>();
+	(analyticsData.assignedPatients || []).forEach((patient: any) => {
+		const proc = patient.procedure || "Other";
+		if (!procedureMap.has(proc)) {
+			procedureMap.set(proc, []);
+		}
+		procedureMap.get(proc)!.push(patient);
+	});
 
-	const procedureMetrics = [
-		{
-			name: "ACL Repair",
-			patients: 12,
-			avgRecoveryDays: 28,
-			adherence: 92,
-			satisfaction: 95,
-		},
-		{
-			name: "Hip Replacement",
-			patients: 15,
-			avgRecoveryDays: 42,
-			adherence: 87,
-			satisfaction: 91,
-		},
-		{
-			name: "Knee Surgery",
-			patients: 10,
-			avgRecoveryDays: 35,
-			adherence: 85,
-			satisfaction: 88,
-		},
-		{
-			name: "Shoulder Surgery",
-			patients: 10,
-			avgRecoveryDays: 30,
-			adherence: 90,
-			satisfaction: 93,
-		},
-	];
+	const procedureMetrics = Array.from(procedureMap.entries()).map(
+		([name, patients]) => {
+			const avgAdherence =
+				patients.reduce((sum, p) => sum + (p.adherence || 0), 0) /
+				patients.length;
+			return {
+				name,
+				patients: patients.length,
+				avgRecoveryDays: 0, // Can be calculated from procedureDate
+				adherence: Math.round(avgAdherence),
+				satisfaction: 0, // Not tracked currently
+			};
+		}
+	);
 
-	const riskDistribution = [
-		{ status: "Stable", count: 38, percentage: 81 },
-		{ status: "Monitor", count: 6, percentage: 13 },
-		{ status: "Critical", count: 3, percentage: 6 },
-	];
+	const riskDistribution = analyticsData.riskDistribution
+		? [
+				{
+					status: "Stable",
+					count: analyticsData.riskDistribution.stable || 0,
+					percentage:
+						analyticsData.totalAssignedPatients > 0
+							? Math.round(
+									((analyticsData.riskDistribution.stable || 0) /
+										analyticsData.totalAssignedPatients) *
+										100
+							  )
+							: 0,
+				},
+				{
+					status: "Monitor",
+					count: analyticsData.riskDistribution.monitor || 0,
+					percentage:
+						analyticsData.totalAssignedPatients > 0
+							? Math.round(
+									((analyticsData.riskDistribution.monitor || 0) /
+										analyticsData.totalAssignedPatients) *
+										100
+							  )
+							: 0,
+				},
+				{
+					status: "Critical",
+					count: analyticsData.riskDistribution.critical || 0,
+					percentage:
+						analyticsData.totalAssignedPatients > 0
+							? Math.round(
+									((analyticsData.riskDistribution.critical || 0) /
+										analyticsData.totalAssignedPatients) *
+										100
+							  )
+							: 0,
+				},
+		  ]
+		: [];
 
 	const timePeriods = ["week", "month", "quarter"] as const;
 
@@ -194,11 +244,72 @@ function Analytics() {
 					borderColor="border-l-red-500"
 				/>
 				<MetricCard
-					label="Check-ins Completed"
-					value={data.completedCheckIns}
+					label="Avg Adherence"
+					value={data.adherence}
 					borderColor="border-l-purple-500"
 				/>
 			</div>
+
+			{/* Adherence Summary */}
+			{adherenceData.summary && (
+				<Card className="p-6 space-y-4">
+					<h2 className="font-semibold text-lg text-foreground">
+						Adherence Overview
+					</h2>
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+						<div>
+							<p className="text-sm text-muted-foreground">
+								Overall Adherence
+							</p>
+							<p className="text-2xl font-bold text-foreground">
+								{adherenceData.summary.avgAdherence}%
+							</p>
+						</div>
+						<div>
+							<p className="text-sm text-muted-foreground">
+								Task Adherence
+							</p>
+							<p className="text-2xl font-bold text-foreground">
+								{adherenceData.summary.avgTaskAdherence}%
+							</p>
+						</div>
+						<div>
+							<p className="text-sm text-muted-foreground">
+								Medication Adherence
+							</p>
+							<p className="text-2xl font-bold text-foreground">
+								{adherenceData.summary.avgMedicationAdherence}%
+							</p>
+						</div>
+					</div>
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+						<div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+							<p className="text-sm text-muted-foreground">
+								Excellent (≥90%)
+							</p>
+							<p className="text-xl font-bold text-green-600">
+								{adherenceData.summary.excellentAdherence}
+							</p>
+						</div>
+						<div className="p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
+							<p className="text-sm text-muted-foreground">
+								Good (75-89%)
+							</p>
+							<p className="text-xl font-bold text-yellow-600">
+								{adherenceData.summary.goodAdherence}
+							</p>
+						</div>
+						<div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg">
+							<p className="text-sm text-muted-foreground">
+								Needs Attention (&lt;75%)
+							</p>
+							<p className="text-xl font-bold text-red-600">
+								{adherenceData.summary.needsAttention}
+							</p>
+						</div>
+					</div>
+				</Card>
+			)}
 
 			{/* Risk Distribution */}
 			<Card className="p-6 space-y-4">

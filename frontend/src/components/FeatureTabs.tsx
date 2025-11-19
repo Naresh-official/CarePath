@@ -72,6 +72,7 @@ function FeatureTabs() {
 				<TabsList className="h-12">
 					{tabs.map((tab) => (
 						<TabsTrigger
+						key={tab.label}
 							value={tab.value}
 							className="data-[state=active]:bg-primary data-[state=active]:text-white transition-colors duration-400"
 						>

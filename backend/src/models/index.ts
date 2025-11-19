@@ -13,6 +13,7 @@ import Article from "./Article.js";
 import Assignment from "./Assignment.js";
 import Note from "./Note.js";
 import ReadHistory from "./ReadHistory.js";
+import FollowUpConsultation from "./FollowUpConsultation.js";
 
 export {
 	User,
@@ -30,4 +31,5 @@ export {
 	Assignment,
 	Note,
 	ReadHistory,
+	FollowUpConsultation,
 };

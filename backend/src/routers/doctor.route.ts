@@ -6,7 +6,11 @@ import {
 	updateNote,
 	deleteNote,
 } from "../controllers/note.controller.js";
-import { getDoctorAnalytics } from "../controllers/analytics.controller.js";
+import {
+	getDoctorAnalytics,
+	getPatientAdherence,
+	getDoctorAdherenceAnalytics,
+} from "../controllers/analytics.controller.js";
 import { getPatientById } from "../controllers/patient-management.controller.js";
 import {
 	getPatientTasks,
@@ -31,7 +35,15 @@ import {
 	getDoctorCheckInById,
 	markCheckInAsReviewed,
 	updatePatientRiskLevel,
+	updatePatientMonitoringDuration,
 } from "../controllers/symptom-checkin.controller.js";
+import {
+	createFollowUpConsultation,
+	getPatientFollowUpConsultations,
+	getFollowUpConsultationById,
+	updateFollowUpConsultation,
+	deleteFollowUpConsultation,
+} from "../controllers/followup-consultation.controller.js";
 
 const router = Router();
 
@@ -42,6 +54,10 @@ router.get("/check-in/:checkInId", getDoctorCheckInById); // Single check-in by 
 router.get("/recovery-trends/:patientId", getDoctorPatientRecoveryTrends); // Recovery trends for a patient
 router.patch("/check-in/:checkInId/review", markCheckInAsReviewed);
 router.patch("/patient/:patientId/risk-level", updatePatientRiskLevel);
+router.patch(
+	"/patient/:patientId/monitoring-duration",
+	updatePatientMonitoringDuration
+);
 
 // Doctor Notes
 router.post("/note", createNote);
@@ -68,8 +84,17 @@ router.get("/exercises", getAllExercises);
 
 // Analytics
 router.get("/analytics", getDoctorAnalytics);
+router.get("/adherence/:patientId", getPatientAdherence);
+router.get("/adherence-analytics", getDoctorAdherenceAnalytics);
 
 // Patient Details View
 router.get("/patient/:patientId", getPatientById);
+
+// Follow-up Consultations
+router.post("/follow-up", createFollowUpConsultation);
+router.get("/follow-ups/:patientId", getPatientFollowUpConsultations);
+router.get("/follow-up/:followUpId", getFollowUpConsultationById);
+router.patch("/follow-up/:followUpId", updateFollowUpConsultation);
+router.delete("/follow-up/:followUpId", deleteFollowUpConsultation);
 
 export default router;

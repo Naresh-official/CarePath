@@ -16,10 +16,11 @@ function PatientHome() {
 	const [patientId, setPatientId] = useState<string | null>(null);
 	const [userName, setUserName] = useState("Patient");
 	const [daysPostOp, setDaysPostOp] = useState(0);
+	const [monitoringDays, setMonitoringDays] = useState(7);
 
 	useEffect(() => {
 		const fetchData = async () => {
-			if (!user?._id) return;
+			if (!user?.id) return;
 
 			try {
 				setLoading(true);
@@ -35,6 +36,7 @@ function PatientHome() {
 				setPatientId(patient._id);
 				setUserName(user.name?.split(" ")[0] || "Patient");
 				setDaysPostOp(patient.daysPostOp || 0);
+				setMonitoringDays(patient.monitoringDays || 7);
 
 				// Fetch today's tasks (excluding medication type)
 				const tasksRes = await patientApi.getTasks(patient._id);
@@ -88,7 +90,9 @@ function PatientHome() {
 	const completedToday = tasks.filter((t) => t.completed).length;
 	const totalTasks = tasks.length;
 	const progressPercent =
-		totalTasks > 0 ? (completedToday / totalTasks) * 100 : 0;
+		monitoringDays > 0
+			? Math.min((daysPostOp / monitoringDays) * 100, 100)
+			: 0;
 
 	const getGreeting = () => {
 		const hour = new Date().getHours();
@@ -137,7 +141,12 @@ function PatientHome() {
 						/>
 					</div>
 					<p className="text-sm text-muted-foreground">
-						{totalTasks === 0
+						{monitoringDays > 0
+							? `Day ${Math.min(
+									daysPostOp,
+									monitoringDays
+								)} of ${monitoringDays}-day monitoring plan`
+							: totalTasks === 0
 							? "No tasks for today"
 							: "You're on track for a smooth recovery"}
 					</p>
